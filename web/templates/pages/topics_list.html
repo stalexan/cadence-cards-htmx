@@ -1,0 +1,29 @@
+{{define "title"}}Topics — Cadence Cards{{end}}
+{{define "content"}}
+<div class="page-header">
+  <h1>Topics</h1>
+  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} New topic</a>
+</div>
+{{if .Data}}
+<div class="card-grid">
+  {{range .Data}}
+  <div class="card entity-card">
+    <a class="entity-title" href="/topics/{{.ID}}">{{.Name}}</a>
+    {{with .TopicDescription}}<p class="muted truncate-2">{{.}}</p>{{end}}
+    <p class="muted">{{.DeckCount}} deck{{if ne .DeckCount 1}}s{{end}} · {{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</p>
+    <div class="row-actions">
+      <a class="btn btn-ghost btn-icon" href="/topics/{{.ID}}/edit" title="Edit">{{template "icon-pencil"}}</a>
+      <form method="post" action="/topics/{{.ID}}/delete" data-confirm="Delete topic “{{.Name}}” and all of its decks and cards?">
+        <button type="submit" class="btn btn-ghost btn-icon btn-danger-icon" title="Delete">{{template "icon-trash"}}</button>
+      </form>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="empty card">
+  <p>No topics yet. Topics group your decks and configure the Claude study assistant.</p>
+  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create your first topic</a>
+</div>
+{{end}}
+{{end}}

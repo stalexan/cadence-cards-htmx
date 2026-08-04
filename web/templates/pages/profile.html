@@ -1,0 +1,44 @@
+{{define "title"}}Profile — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+{{$u := .User}}
+<div class="page-header">
+  <h1>Profile</h1>
+</div>
+<div class="detail-columns">
+  <div class="card form-card">
+    <h2 class="card-title">Account</h2>
+    {{if $d.ProfileSaved}}<div class="alert alert-success">Profile updated.</div>{{end}}
+    {{if $d.ProfileError}}<div class="alert alert-error">{{$d.ProfileError}}</div>{{end}}
+    <form method="post" action="/profile" class="stack">
+      <label class="field">
+        <span class="label">Name</span>
+        <input class="input" type="text" name="name" value="{{deref $u.Name}}" required>
+      </label>
+      <label class="field">
+        <span class="label">Email</span>
+        <input class="input" type="email" name="email" value="{{deref $u.Email}}" required>
+      </label>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </div>
+
+  <div class="card form-card">
+    <h2 class="card-title">Change password</h2>
+    {{if $d.PasswordChanged}}<div class="alert alert-success">Password changed. Other sessions were signed out.</div>{{end}}
+    {{if $d.PasswordError}}<div class="alert alert-error">{{$d.PasswordError}}</div>{{end}}
+    <form method="post" action="/profile/password" class="stack">
+      <label class="field">
+        <span class="label">Current password</span>
+        <input class="input" type="password" name="currentPassword" required autocomplete="current-password">
+      </label>
+      <label class="field">
+        <span class="label">New password</span>
+        <input class="input" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
+        <span class="hint">At least 8 characters. Changing your password signs out other sessions.</span>
+      </label>
+      <button type="submit" class="btn btn-primary">Change password</button>
+    </form>
+  </div>
+</div>
+{{end}}

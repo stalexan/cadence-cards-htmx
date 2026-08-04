@@ -1,0 +1,77 @@
+{{/* One study card: swapped into #study-area by GET /study/{topicId}/next.
+     Context: studyCardData{Item, Params, HistoryJSON}. */}}
+
+{{define "study_progress"}}
+<div id="study-progress" class="progress" hx-swap-oob="true">
+  <div class="progress-track"><div class="progress-fill" data-progress="{{.Percent}}"></div></div>
+  <span class="progress-label">{{.Done}} / {{.Total}}</span>
+</div>
+{{end}}
+
+{{define "study_params_hidden"}}
+{{/* Hidden session-parameter inputs. Context: dict "Params" p "Completed" n */}}
+{{$p := .Params}}
+{{range $p.DeckIDs}}<input type="hidden" name="deckIds" value="{{.}}">{{end}}
+{{if $p.Priority}}<input type="hidden" name="priority" value="{{$p.Priority}}">{{end}}
+{{if not $p.IncludeNew}}<input type="hidden" name="includeNew" value="false">{{end}}
+{{if gt $p.Limit 0}}<input type="hidden" name="limit" value="{{$p.Limit}}">{{end}}
+<input type="hidden" name="total" value="{{$p.Total}}">
+<input type="hidden" name="completed" value="{{.Completed}}">
+{{end}}
+
+{{define "study_card"}}
+{{$item := .Item}}
+{{$p := .Params}}
+{{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total))}}
+
+<article class="card study-card">
+  <header class="study-card-header">
+    <div>
+      <span class="muted">{{$item.DeckName}}</span>
+      {{if $item.IsReversed}}<span class="tag">Reverse</span>{{end}}
+    </div>
+    {{template "priority_badge" $item.Priority}}
+  </header>
+
+  <div class="study-prompt">
+    <span class="field-label">{{$item.PromptLabel}}</span>
+    <p class="prompt-text">{{$item.Prompt}}</p>
+  </div>
+
+  <div id="chat-messages" class="chat-messages study-chat">
+    {{/* Pending stub: fires on load, server generates the question and the
+         response replaces this element (outerHTML). */}}
+    <div class="chat-msg chat-assistant chat-pending"
+         hx-post="/study/{{$p.TopicID}}/question"
+         hx-vals='{"scheduleId": {{$item.ScheduleID}}}'
+         hx-trigger="load" hx-swap="outerHTML">
+      <div class="chat-bubble"><span class="typing-dots"><i></i><i></i><i></i></span> Claude is preparing a question…</div>
+    </div>
+  </div>
+
+  <form class="chat-form" hx-post="/study/{{$p.TopicID}}/chat"
+        hx-target="#chat-messages" hx-swap="beforeend"
+        hx-disabled-elt="find button" hx-indicator="#chat-spinner"
+        data-chat-form>
+    <input type="hidden" name="scheduleId" value="{{$item.ScheduleID}}">
+    <input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}">
+    <textarea class="input chat-input" name="message" rows="1" placeholder="Type your answer…" data-autoresize required></textarea>
+    <button type="submit" class="btn btn-primary">Send</button>
+    <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </form>
+
+  <section class="answer-section">
+    <button type="button" class="btn btn-secondary" data-toggle="#answer-panel"
+            data-label-show="Show Answer" data-label-hide="Hide Answer">Show Answer</button>
+    <div id="answer-panel" hidden>
+      <div class="study-answer">
+        <span class="field-label">{{$item.AnswerLabel}}</span>
+        <p class="prompt-text">{{$item.Answer}}</p>
+        {{with $item.Note}}<div class="study-note"><span class="field-label">Note</span><p>{{.}}</p></div>{{end}}
+      </div>
+    </div>
+  </section>
+
+  {{template "grade_area" (dict "ScheduleID" $item.ScheduleID "Version" $item.Version "Params" $p "Graded" false "Grade" "" "NewInterval" 0)}}
+</article>
+{{end}}

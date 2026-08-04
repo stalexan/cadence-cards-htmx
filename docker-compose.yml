@@ -1,0 +1,34 @@
+# Single-container deployment. The app joins the same external shared network
+# as the Svelte stack (alias cadence-cards) so the existing nginx reverse
+# proxy keeps working unchanged. Create the network first if needed:
+#   docker network create "${SHARED_NETWORK_NAME:-cadence-cards-shared}"
+services:
+  app:
+    build: .
+    networks:
+      default: {}
+      shared:
+        aliases: [cadence-cards]
+    environment:
+      - PORT=3000
+      - DB_PATH=/data/cadence.db
+      - TZ=${TZ:-UTC}
+      - APP_VERSION=${APP_VERSION:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4-8}
+      - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS:-4000}
+      - ENABLE_PUBLIC_REGISTRATION=${ENABLE_PUBLIC_REGISTRATION:-false}
+    volumes:
+      - cadence_data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+volumes:
+  cadence_data:
+
+networks:
+  shared:
+    external: true
+    name: ${SHARED_NETWORK_NAME:-cadence-cards-shared}

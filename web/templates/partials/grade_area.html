@@ -1,0 +1,55 @@
+{{/* Grade buttons + Next Card. Swapped (outerHTML) by the grade POST.
+     Context: gradeAreaData (or an equivalent dict from study_card.html). */}}
+{{define "grade_area"}}
+{{$p := .Params}}
+<div id="grade-area" class="grade-area">
+  {{if .Graded}}
+  <div class="grade-buttons">
+    <button class="btn grade-btn grade-incorrect{{if eq .Grade "INCORRECT"}} selected{{end}}" disabled>Incorrect</button>
+    <button class="btn grade-btn grade-hesitation{{if eq .Grade "CORRECT_WITH_HESITATION"}} selected{{end}}" disabled>Correct (hesitated)</button>
+    <button class="btn grade-btn grade-perfect{{if eq .Grade "CORRECT_PERFECT_RECALL"}} selected{{end}}" disabled>Perfect recall</button>
+  </div>
+  <p class="muted grade-result">Graded. Next review in {{.NewInterval}} day{{if ne .NewInterval 1}}s{{end}}.</p>
+  <div class="grade-next">
+    <button class="btn btn-primary"
+            hx-get="{{$p.NextURL (add $p.Completed 1)}}"
+            hx-target="#study-area" hx-swap="innerHTML">Next Card</button>
+  </div>
+  {{else}}
+  <form class="grade-buttons"
+        hx-post="/study/schedules/{{.ScheduleID}}/grade"
+        hx-target="#grade-area" hx-swap="outerHTML"
+        hx-disabled-elt="find button">
+    <input type="hidden" name="topicId" value="{{$p.TopicID}}">
+    <input type="hidden" name="version" value="{{.Version}}">
+    {{template "study_params_hidden" (dict "Params" $p "Completed" $p.Completed)}}
+    <button type="submit" name="grade" value="INCORRECT" class="btn grade-btn grade-incorrect">Incorrect</button>
+    <button type="submit" name="grade" value="CORRECT_WITH_HESITATION" class="btn grade-btn grade-hesitation">Correct (hesitated)</button>
+    <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL" class="btn grade-btn grade-perfect">Perfect recall</button>
+  </form>
+  <div class="grade-next">
+    <button class="btn btn-secondary"
+            hx-get="{{$p.NextURL $p.Completed}}"
+            hx-target="#study-area" hx-swap="innerHTML"
+            hx-confirm="You haven't graded this card yet. Continue anyway?">Next Card</button>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/* 409 body: an OOB notice appended to the chat plus a replacement grade
+     area that auto-refetches the card after a short delay. */}}
+{{define "grade_conflict"}}
+{{$p := .Params}}
+<div hx-swap-oob="beforeend:#chat-messages">
+  <div class="chat-msg chat-assistant chat-error">
+    <div class="chat-bubble">This card was updated elsewhere. Refreshing it now — please grade again.</div>
+  </div>
+</div>
+<div id="grade-area" class="grade-area">
+  <div class="muted"
+       hx-get="{{$p.NextURL $p.Completed}}"
+       hx-trigger="load delay:1200ms"
+       hx-target="#study-area" hx-swap="innerHTML">Refreshing card…</div>
+</div>
+{{end}}

@@ -1,0 +1,22 @@
+{{define "title"}}Chat — Cadence Cards{{end}}
+{{define "content"}}
+<div class="page-header">
+  <h1>Chat</h1>
+</div>
+{{if .Data}}
+<p class="muted">Pick a topic to chat with Claude about.</p>
+<div class="card-grid">
+  {{range .Data}}
+  <a class="card entity-card topic-pick" href="/chat/{{.ID}}">
+    <span class="entity-title">{{.Name}}</span>
+    {{with .TopicDescription}}<p class="muted truncate-2">{{.}}</p>{{end}}
+  </a>
+  {{end}}
+</div>
+{{else}}
+<div class="empty card">
+  <p>No topics yet — create one to start chatting.</p>
+  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
+</div>
+{{end}}
+{{end}}

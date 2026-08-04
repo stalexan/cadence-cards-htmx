@@ -1,0 +1,27 @@
+{{/* Chat bubbles. chat_exchange is the POST response for both the topic chat
+     and the study chat: a user bubble + an assistant bubble appended to the
+     message list, plus an OOB update of the hidden #chat-history input. */}}
+
+{{define "chat_bubble_user"}}
+<div class="chat-msg chat-user"><div class="chat-bubble">{{.}}</div></div>
+{{end}}
+
+{{define "chat_bubble_assistant"}}
+<div class="chat-msg chat-assistant{{if .IsError}} chat-error{{end}}">
+  <div class="chat-bubble markdown-content">{{markdown .Text}}</div>
+  <button type="button" class="btn btn-ghost btn-icon copy-btn" data-copy="{{.Text}}" title="Copy message">{{template "icon-clipboard"}}</button>
+</div>
+{{end}}
+
+{{define "chat_exchange"}}
+{{template "chat_bubble_user" .UserMessage}}
+{{template "chat_bubble_assistant" (dict "Text" .Assistant "IsError" .IsError)}}
+<input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}" hx-swap-oob="true">
+{{end}}
+
+{{/* The study question response: replaces the pending stub (outerHTML) and
+     OOB-fills the history input. */}}
+{{define "study_question"}}
+{{template "chat_bubble_assistant" (dict "Text" .Question "IsError" .IsError)}}
+<input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}" hx-swap-oob="true">
+{{end}}

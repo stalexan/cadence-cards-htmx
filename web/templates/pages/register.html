@@ -1,0 +1,23 @@
+{{define "title"}}Register — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<h2 class="auth-title">Create an account</h2>
+{{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
+<form method="post" action="/register" class="stack">
+  <label class="field">
+    <span class="label">Name</span>
+    <input class="input" type="text" name="name" value="{{$d.Name}}" required autofocus autocomplete="name">
+  </label>
+  <label class="field">
+    <span class="label">Email</span>
+    <input class="input" type="email" name="email" value="{{$d.Email}}" required autocomplete="email">
+  </label>
+  <label class="field">
+    <span class="label">Password</span>
+    <input class="input" type="password" name="password" required minlength="8" autocomplete="new-password">
+    <span class="hint">At least 8 characters.</span>
+  </label>
+  <button type="submit" class="btn btn-primary btn-block">Create account</button>
+</form>
+<p class="auth-alt">Already have an account? <a href="/login">Sign in</a></p>
+{{end}}

@@ -1,0 +1,25 @@
+{{define "title"}}Chat: {{.Data.Name}} — Cadence Cards{{end}}
+{{define "content"}}
+{{$topic := .Data}}
+<div class="page-header">
+  <a class="back-link" href="/chat">{{template "icon-arrow-left"}} Chat</a>
+  <h1>Chat about {{$topic.Name}}</h1>
+</div>
+
+<div class="card chat-card">
+  <div id="chat-messages" class="chat-messages">
+    <div class="chat-msg chat-assistant">
+      <div class="chat-bubble">Hi! Ask me anything about {{$topic.Name}}.</div>
+    </div>
+  </div>
+  <form class="chat-form" hx-post="/chat/{{$topic.ID}}/message"
+        hx-target="#chat-messages" hx-swap="beforeend"
+        hx-disabled-elt="find button" hx-indicator="#chat-spinner"
+        data-chat-form>
+    <input type="hidden" id="chat-history" name="history" value="[]">
+    <textarea class="input chat-input" name="message" rows="1" placeholder="Ask about {{$topic.Name}}…" data-autoresize required></textarea>
+    <button type="submit" class="btn btn-primary">Send</button>
+    <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </form>
+</div>
+{{end}}

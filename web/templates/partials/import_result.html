@@ -1,0 +1,18 @@
+{{/* Import outcome, swapped into #import-result. Context: importResultData. */}}
+{{define "import_result"}}
+<div class="import-result">
+  {{if .Success}}
+  <div class="alert alert-success">
+    <strong>{{.Message}}</strong>
+    <p>Imported {{.ImportedCount}} card{{if ne .ImportedCount 1}}s{{end}} into “{{.DeckName}}”.{{if gt .FailedCount 0}} {{.FailedCount}} card{{if ne .FailedCount 1}}s{{end}} failed.{{end}}</p>
+  </div>
+  {{else}}
+  <div class="alert alert-error"><strong>{{.Message}}</strong></div>
+  {{end}}
+  {{if .Errors}}
+  <ul class="import-errors">
+    {{range .Errors}}<li>{{.}}</li>{{end}}
+  </ul>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,40 @@
+{{define "title"}}{{.Data.Topic.Name}} — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-header">
+  <a class="back-link" href="/topics">{{template "icon-arrow-left"}} Topics</a>
+</div>
+<div class="page-header">
+  <div>
+    <h1>{{$d.Topic.Name}}</h1>
+    {{with $d.Topic.TopicDescription}}<p class="muted">{{.}}</p>{{end}}
+  </div>
+  <div class="actions-row">
+    <a class="btn btn-secondary" href="/topics/{{$d.Topic.ID}}/edit">{{template "icon-pencil"}} Edit</a>
+    <a class="btn btn-secondary" href="/study/{{$d.Topic.ID}}/setup">{{template "icon-play"}} Study</a>
+    <a class="btn btn-primary" href="/decks/new?topicId={{$d.Topic.ID}}">{{template "icon-plus"}} New deck</a>
+  </div>
+</div>
+
+{{if $d.Decks}}
+<div class="card-grid">
+  {{range $d.Decks}}
+  <div class="card entity-card">
+    <a class="entity-title" href="/decks/{{.ID}}">{{.Name}}</a>
+    <p class="muted">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}{{if .IsBidirectional}} · bidirectional{{end}}</p>
+    <div class="row-actions">
+      <a class="btn btn-ghost btn-icon" href="/decks/{{.ID}}/edit" title="Edit">{{template "icon-pencil"}}</a>
+      <form method="post" action="/decks/{{.ID}}/delete" data-confirm="Delete deck “{{.Name}}” and all of its cards?">
+        <button type="submit" class="btn btn-ghost btn-icon btn-danger-icon" title="Delete">{{template "icon-trash"}}</button>
+      </form>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="empty card">
+  <p>No decks in this topic yet.</p>
+  <a class="btn btn-primary" href="/decks/new?topicId={{$d.Topic.ID}}">{{template "icon-plus"}} Create a deck</a>
+</div>
+{{end}}
+{{end}}

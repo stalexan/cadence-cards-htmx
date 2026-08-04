@@ -1,0 +1,61 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{block "title" .}}Cadence Cards{{end}}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <!-- allowEval:false keeps CSP free of 'unsafe-eval'; 409 swaps enable the
+       version-conflict flow in the study session. -->
+  <meta name="htmx-config" content='{"allowEval":false,"responseHandling":[{"code":"204","swap":false},{"code":"409","swap":true},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <input type="checkbox" id="nav-toggle" class="nav-toggle-input" aria-hidden="true">
+  <header class="mobile-bar">
+    <label for="nav-toggle" class="nav-toggle-btn" aria-label="Toggle navigation">{{template "icon-menu"}}</label>
+    <span class="mobile-title">Cadence Cards</span>
+  </header>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <a href="/dashboard">Cadence Cards</a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-link{{if eq .Path "/dashboard"}} active{{end}}">{{template "icon-home"}}<span>Dashboard</span></a>
+      <a href="/topics" class="nav-link{{if hasPrefix .Path "/topics"}} active{{end}}">{{template "icon-folder"}}<span>Topics</span></a>
+      <a href="/decks" class="nav-link{{if hasPrefix .Path "/decks"}} active{{end}}">{{template "icon-layers"}}<span>Decks</span></a>
+      <a href="/cards" class="nav-link{{if hasPrefix .Path "/cards"}} active{{end}}">{{template "icon-cards"}}<span>Cards</span></a>
+      <a href="/study" class="nav-link{{if hasPrefix .Path "/study"}} active{{end}}">{{template "icon-play"}}<span>Study</span></a>
+      <a href="/chat" class="nav-link{{if hasPrefix .Path "/chat"}} active{{end}}">{{template "icon-chat"}}<span>Chat</span></a>
+      <a href="/import" class="nav-link{{if hasPrefix .Path "/import"}} active{{end}}">{{template "icon-upload"}}<span>Import</span></a>
+      <a href="/profile" class="nav-link{{if hasPrefix .Path "/profile"}} active{{end}}">{{template "icon-user"}}<span>Profile</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      {{with .User}}
+      <div class="user-row">
+        <span class="avatar">{{avatarInitial .}}</span>
+        <span class="user-name">{{if .Name}}{{.Name}}{{else}}{{deref .Email}}{{end}}</span>
+      </div>
+      {{end}}
+      <form method="post" action="/logout">
+        <button type="submit" class="btn btn-ghost btn-sm signout">{{template "icon-logout"}}<span>Sign out</span></button>
+      </form>
+      {{if .AppVersion}}<div class="app-version">v{{.AppVersion}}</div>{{end}}
+    </div>
+  </aside>
+  <main class="main">
+    {{template "content" .}}
+  </main>
+</div>
+<dialog id="confirm-dialog" class="confirm-dialog">
+  <p id="confirm-dialog-message">Are you sure?</p>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-secondary" data-close-dialog>Cancel</button>
+    <button type="button" class="btn btn-danger" id="confirm-dialog-ok">Confirm</button>
+  </div>
+</dialog>
+</body>
+</html>{{end}}

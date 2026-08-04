@@ -1,0 +1,65 @@
+{{define "title"}}Study setup — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-header">
+  <a class="back-link" href="/study">{{template "icon-arrow-left"}} Study</a>
+</div>
+<div class="page-header">
+  <h1>Study {{$d.Topic.Name}}</h1>
+</div>
+
+<div class="card study-stats">
+  <div class="stat-inline"><strong>{{$d.Stats.TotalCards}}</strong> cards</div>
+  <div class="stat-inline"><strong>{{$d.Stats.DueTotal}}</strong> due</div>
+  <div class="stat-inline"><span class="badge badge-a">A</span> {{$d.Stats.DueA}}</div>
+  <div class="stat-inline"><span class="badge badge-b">B</span> {{$d.Stats.DueB}}</div>
+  <div class="stat-inline"><span class="badge badge-c">C</span> {{$d.Stats.DueC}}</div>
+</div>
+
+{{/* A plain GET form: checkboxes named deckIds naturally produce repeated
+     query params, all of which the server honors. */}}
+<form class="card form-card stack" method="get" action="/study/{{$d.Topic.ID}}">
+  <div class="field">
+    <span class="label">Decks <span class="hint">none selected = all decks</span></span>
+    <div class="actions-row">
+      <button type="button" class="btn btn-ghost btn-sm" data-check-all="deckIds" data-check-state="on">Select all</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-check-all="deckIds" data-check-state="off">Clear</button>
+    </div>
+    <div class="check-list">
+      {{range $d.Decks}}
+      <label class="check-field">
+        <input type="checkbox" name="deckIds" value="{{.ID}}" checked>
+        <span>{{.Name}} <span class="hint">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</span></span>
+      </label>
+      {{end}}
+    </div>
+  </div>
+
+  <label class="field">
+    <span class="label">Priority</span>
+    <select class="input select" name="priority">
+      <option value="">All priorities</option>
+      <option value="A">A — High only</option>
+      <option value="B">B — Medium only</option>
+      <option value="C">C — Low only</option>
+    </select>
+  </label>
+
+  {{/* When unchecked, app.js enables the hidden includeNew=false input on
+       submit (an unchecked checkbox sends nothing). */}}
+  <label class="check-field">
+    <input type="checkbox" data-mirror-unchecked="includeNew" checked>
+    <span>Include new (never-studied) cards</span>
+  </label>
+  <input type="hidden" name="includeNew" value="false" disabled>
+
+  <label class="field">
+    <span class="label">Card limit <span class="hint">blank = no limit</span></span>
+    <input class="input input-sm" type="number" name="limit" min="1" placeholder="20">
+  </label>
+
+  <div class="actions-row">
+    <button type="submit" class="btn btn-primary">{{template "icon-play"}} Start session</button>
+  </div>
+</form>
+{{end}}

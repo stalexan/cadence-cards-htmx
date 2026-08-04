@@ -1,0 +1,8 @@
+{{define "title"}}Cards — Cadence Cards{{end}}
+{{define "content"}}
+<div class="page-header">
+  <h1>Cards</h1>
+  <a class="btn btn-primary" href="/cards/new">{{template "icon-plus"}} New card</a>
+</div>
+{{template "card_table" .Data}}
+{{end}}

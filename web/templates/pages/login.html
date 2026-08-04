@@ -1,0 +1,19 @@
+{{define "title"}}Sign in — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<h2 class="auth-title">Sign in</h2>
+{{if $d.Registered}}<div class="alert alert-success">Account created. You can sign in now.</div>{{end}}
+{{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
+<form method="post" action="/login" class="stack">
+  <label class="field">
+    <span class="label">Email</span>
+    <input class="input" type="email" name="email" value="{{$d.Email}}" required autofocus autocomplete="email">
+  </label>
+  <label class="field">
+    <span class="label">Password</span>
+    <input class="input" type="password" name="password" required autocomplete="current-password">
+  </label>
+  <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+</form>
+<p class="auth-alt">Don't have an account? <a href="/register">Register</a></p>
+{{end}}

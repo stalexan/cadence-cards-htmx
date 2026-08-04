@@ -1,0 +1,21 @@
+{{/* Pagination controls for the card table. Context: cardTableData. */}}
+{{define "pagination"}}
+{{if gt .TotalPages 1}}
+<nav class="pagination" aria-label="Pagination">
+  {{$d := .}}
+  {{if gt .Page 1}}
+  <button class="btn btn-secondary btn-sm"
+          hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}"
+          hx-target="#card-table" hx-swap="outerHTML"
+          hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}">Previous</button>
+  {{end}}
+  <span class="pagination-info">Page {{.Page}} of {{.TotalPages}}</span>
+  {{if lt .Page .TotalPages}}
+  <button class="btn btn-secondary btn-sm"
+          hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (add .Page 1))}}"
+          hx-target="#card-table" hx-swap="outerHTML"
+          hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (add .Page 1))}}">Next</button>
+  {{end}}
+</nav>
+{{end}}
+{{end}}

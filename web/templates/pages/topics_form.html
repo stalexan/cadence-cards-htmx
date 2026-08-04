@@ -1,0 +1,53 @@
+{{define "title"}}{{if .Data.Topic}}Edit topic{{else}}New topic{{end}} — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+{{$t := $d.Topic}}
+{{/* On validation errors re-show the submitted values; otherwise the topic's. */}}
+{{$v := $d.Params}}
+{{if and $t (not $d.Error)}}{{end}}
+<div class="page-header">
+  <a class="back-link" href="/topics">{{template "icon-arrow-left"}} Topics</a>
+</div>
+<div class="card form-card">
+  <h1>{{if $t}}Edit topic{{else}}New topic{{end}}</h1>
+  {{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
+  <form method="post" action="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}" class="stack">
+    <label class="field">
+      <span class="label">Name *</span>
+      <input class="input" type="text" name="name" required
+             value="{{if $v.Name}}{{$v.Name}}{{else if $t}}{{$t.Name}}{{end}}">
+    </label>
+    <fieldset class="fieldset">
+      <legend>Claude assistant configuration <span class="hint">(all optional)</span></legend>
+      <label class="field">
+        <span class="label">Description</span>
+        <textarea class="input" name="topicDescription" rows="2" data-autoresize placeholder="What this topic covers">{{if $v.TopicDescription}}{{deref $v.TopicDescription}}{{else if $t}}{{deref $t.TopicDescription}}{{end}}</textarea>
+      </label>
+      <label class="field">
+        <span class="label">Expertise <span class="hint">e.g. “tutor”, “language teacher”</span></span>
+        <input class="input" type="text" name="expertise" value="{{if $v.Expertise}}{{deref $v.Expertise}}{{else if $t}}{{deref $t.Expertise}}{{end}}">
+      </label>
+      <label class="field">
+        <span class="label">Focus <span class="hint">e.g. “vocabulary and grammar”</span></span>
+        <input class="input" type="text" name="focus" value="{{if $v.Focus}}{{deref $v.Focus}}{{else if $t}}{{deref $t.Focus}}{{end}}">
+      </label>
+      <label class="field">
+        <span class="label">Context type <span class="hint">e.g. “usage examples”</span></span>
+        <input class="input" type="text" name="contextType" value="{{if $v.ContextType}}{{deref $v.ContextType}}{{else if $t}}{{deref $t.ContextType}}{{end}}">
+      </label>
+      <label class="field">
+        <span class="label">Example interaction</span>
+        <textarea class="input" name="example" rows="3" data-autoresize placeholder="An example H/A exchange for the assistant">{{if $v.Example}}{{deref $v.Example}}{{else if $t}}{{deref $t.Example}}{{end}}</textarea>
+      </label>
+      <label class="field">
+        <span class="label">Question guidance <span class="hint">extra instructions for generated questions</span></span>
+        <textarea class="input" name="question" rows="2" data-autoresize>{{if $v.Question}}{{deref $v.Question}}{{else if $t}}{{deref $t.Question}}{{end}}</textarea>
+      </label>
+    </fieldset>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">{{if $t}}Save changes{{else}}Create topic{{end}}</button>
+      <a class="btn btn-secondary" href="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}">Cancel</a>
+    </div>
+  </form>
+</div>
+{{end}}

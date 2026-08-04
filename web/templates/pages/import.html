@@ -1,0 +1,36 @@
+{{define "title"}}Import — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-header">
+  <h1>Import cards</h1>
+</div>
+<div class="card form-card">
+  <p class="muted">Paste YAML exported from Cadence Cards (with or without the metadata header). Cards import into the deck you choose; SM-2 progress in the YAML is preserved.</p>
+  {{if $d.Decks}}
+  <form class="stack" hx-post="/import" hx-target="#import-result" hx-swap="innerHTML"
+        hx-disabled-elt="find button" hx-indicator="#import-spinner">
+    <label class="field">
+      <span class="label">Target deck *</span>
+      <select class="input select" name="deckId" required>
+        <option value="">Select a deck…</option>
+        {{range $d.Decks}}<option value="{{.ID}}">{{.TopicName}} / {{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label class="field">
+      <span class="label">YAML content *</span>
+      <textarea class="input mono" name="yamlContent" rows="14" required placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
+    </label>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">{{template "icon-upload"}} Import</button>
+      <span id="import-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+    </div>
+  </form>
+  <div id="import-result"></div>
+  {{else}}
+  <div class="empty">
+    <p>You need a deck before importing cards.</p>
+    <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} Create a deck</a>
+  </div>
+  {{end}}
+</div>
+{{end}}

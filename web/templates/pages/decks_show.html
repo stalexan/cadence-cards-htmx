@@ -1,0 +1,34 @@
+{{define "title"}}{{.Data.Deck.Name}} — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+{{$deck := $d.Deck}}
+<div class="page-header">
+  <a class="back-link" href="/decks">{{template "icon-arrow-left"}} Decks</a>
+</div>
+<div class="page-header">
+  <div>
+    <h1>{{$deck.Name}}</h1>
+    <p class="muted">{{$deck.TopicName}} · {{$deck.CardCount}} card{{if ne $deck.CardCount 1}}s{{end}}{{if $deck.IsBidirectional}} · bidirectional{{end}}</p>
+  </div>
+  <div class="actions-row">
+    <a class="btn btn-secondary" href="/decks/{{$deck.ID}}/edit">{{template "icon-pencil"}} Edit</a>
+    <button type="button" class="btn btn-secondary" data-open-dialog="#share-dialog">{{template "icon-download"}} Share / Export</button>
+    <a class="btn btn-primary" href="/cards/new?deckId={{$deck.ID}}">{{template "icon-plus"}} New card</a>
+  </div>
+</div>
+
+{{template "card_table" $d.Table}}
+
+<dialog id="share-dialog" class="share-dialog">
+  <h2>Export “{{$deck.Name}}”</h2>
+  <p class="muted">Download the deck as YAML. It can be re-imported here or into another Cadence Cards instance.</p>
+  <label class="check-field">
+    <input type="checkbox" id="share-include-sm2" data-export-toggle data-export-base="/decks/{{$deck.ID}}/export">
+    <span>Include SM-2 study progress</span>
+  </label>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
+    <a class="btn btn-primary" id="share-download" href="/decks/{{$deck.ID}}/export" download>{{template "icon-download"}} Download YAML</a>
+  </div>
+</dialog>
+{{end}}

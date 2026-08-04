@@ -1,0 +1,29 @@
+{{define "title"}}Study — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-header">
+  <h1>Study</h1>
+</div>
+{{if $d.Topics}}
+<p class="muted">Pick a topic to study.</p>
+<div class="card-grid">
+  {{range $d.Topics}}
+  {{$due := index $d.DueCounts .ID}}
+  <a class="card entity-card topic-pick" href="/study/{{.ID}}/setup">
+    <span class="entity-title">{{.Name}}</span>
+    <p class="muted">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</p>
+    {{if gt $due 0}}
+    <span class="due-pill">{{$due}} due</span>
+    {{else}}
+    <span class="muted">Nothing due</span>
+    {{end}}
+  </a>
+  {{end}}
+</div>
+{{else}}
+<div class="empty card">
+  <p>No topics yet — create one and add some cards to start studying.</p>
+  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
+</div>
+{{end}}
+{{end}}
