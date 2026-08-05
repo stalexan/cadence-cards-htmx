@@ -46,6 +46,33 @@ DB_PATH=./dev.db COOKIE_SECURE=false ENABLE_PUBLIC_REGISTRATION=true go run ./cm
 `CLAUDE_API_KEY` is only needed for the study-question/chat features; without it the UI degrades to
 error bubbles.
 
+## Configuration
+
+All configuration is environment variables — there is no config file. `.env.example` is the
+template; copy it to `.env`, which `docker compose` reads automatically.
+
+| Variable | Default | Read by | Notes |
+| --- | --- | --- | --- |
+| `PORT` | `3000` | app | Compose hardcodes `3000`; effectively local-dev only. |
+| `DB_PATH` | `/data/cadence.db` | app | Compose hardcodes the volume path. Set `./dev.db` locally. |
+| `CLAUDE_API_KEY` | *(empty)* | app | Study-question generation and chat. Unset ⇒ those features return error bubbles; the rest of the app works. |
+| `CLAUDE_MODEL` | `claude-opus-4-8` | app | |
+| `CLAUDE_MAX_TOKENS` | `1000` | app | Compose passes `4000` unless overridden. Must be ≥ 1. |
+| `ENABLE_PUBLIC_REGISTRATION` | `false` | app | When off, create users with `-create-user`. |
+| `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
+| `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |
+| `APP_VERSION` | *(empty)* | app | Informational; shown in the sidebar footer. |
+| `TZ` | `UTC` | container | SM-2 due dates use local-midnight day boundaries, so this decides when a card becomes due. Set it to your users' timezone. |
+| `SHARED_NETWORK_NAME` | `cadence-cards-shared` | compose | External network the reverse proxy lives on. Not seen by the app. |
+
+Booleans are parsed strictly: only the literal string `true` enables them, anything else is false.
+`PORT` and `CLAUDE_MAX_TOKENS` fail startup with an error if they are set but unparseable.
+
+The four "rarely needed" variables in `.env.example` (`PORT`, `DB_PATH`, `COOKIE_SECURE`,
+`DISABLE_RATE_LIMITING`) are not passed through by [`docker-compose.yml`](docker-compose.yml) —
+uncommenting them in `.env` has no effect on the container. Add them to the `environment:` block if
+you need them there.
+
 ## Deployment
 
 ```bash
