@@ -32,6 +32,10 @@ backup-*.db
 *.swp
 *~
 .DS_Store
+# macOS AppleDouble resource forks (go:embed skips them, git shouldn't see them)
+._*
+.AppleDouble
+__MACOSX/
 
 # Misc
 tmp/
