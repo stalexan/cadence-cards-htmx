@@ -139,7 +139,11 @@ type pageData struct {
 	User       *store.User
 	Path       string
 	AppVersion string
-	Data       any
+	// AssetVersion fingerprints web/static so the layouts can bust the cache
+	// on /static URLs. Distinct from AppVersion, which is informational and
+	// empty unless APP_VERSION is set.
+	AssetVersion string
+	Data         any
 }
 
 // render writes a full page using its layout.
@@ -150,10 +154,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 	pd := pageData{
-		User:       userFrom(r),
-		Path:       r.URL.Path,
-		AppVersion: s.cfg.AppVersion,
-		Data:       data,
+		User:         userFrom(r),
+		Path:         r.URL.Path,
+		AppVersion:   s.cfg.AppVersion,
+		AssetVersion: s.assetVersion,
+		Data:         data,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)

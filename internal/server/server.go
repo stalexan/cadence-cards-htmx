@@ -23,12 +23,13 @@ type AI interface {
 
 // Server holds the application's HTTP surface.
 type Server struct {
-	cfg      config.Config
-	store    *store.Store
-	ai       AI
-	limiter  *ratelimit.Limiter
-	pages    map[string]*template.Template
-	partials *template.Template
+	cfg          config.Config
+	store        *store.Store
+	ai           AI
+	limiter      *ratelimit.Limiter
+	pages        map[string]*template.Template
+	partials     *template.Template
+	assetVersion string
 }
 
 // New builds the Server and its handler tree.
@@ -37,13 +38,18 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	if err != nil {
 		return nil, nil, fmt.Errorf("templates: %w", err)
 	}
+	av, err := assetVersion()
+	if err != nil {
+		return nil, nil, fmt.Errorf("asset version: %w", err)
+	}
 	s := &Server{
-		cfg:      cfg,
-		store:    st,
-		ai:       ai,
-		limiter:  ratelimit.New(cfg.DisableRateLimiting),
-		pages:    pages,
-		partials: partials,
+		cfg:          cfg,
+		store:        st,
+		ai:           ai,
+		limiter:      ratelimit.New(cfg.DisableRateLimiting),
+		pages:        pages,
+		partials:     partials,
+		assetVersion: av,
 	}
 
 	mux := http.NewServeMux()
@@ -140,9 +146,19 @@ func (s *Server) Cleanup(now time.Time) {
 }
 
 // cacheStatic marks embedded assets long-lived (they change with the binary).
+//
+// A request carrying the ?v= fingerprint (see assets.go) can be cached forever,
+// because changing the file changes the URL. Anything else — a bare
+// /favicon.svg from the browser's default probe, a hand-typed asset URL — gets a
+// short TTL instead, so an unversioned path can never pin a stale asset for a
+// year.
 func cacheStatic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=86400")
+		if r.URL.Query().Has("v") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=300")
+		}
 		next.ServeHTTP(w, r)
 	})
 }
