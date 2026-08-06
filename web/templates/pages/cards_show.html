@@ -2,23 +2,44 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$c := $d.Card}}
-<div class="page-header">
-  <a class="back-link" href="/decks/{{$c.DeckID}}">{{template "icon-arrow-left"}} {{$c.DeckName}}</a>
+<div class="back-link-row">
+  <a class="back-link" href="/decks/{{$c.DeckID}}">{{template "icon-arrow-left"}}{{$c.DeckName}}</a>
 </div>
 
 {{if $d.VersionConflict}}
-<div class="alert alert-error">This card was modified by another request. The latest version is shown below — please re-apply your changes.</div>
+{{template "alert" (dict "Kind" "warning" "Title" "Card was modified" "Body" "This card was modified by another request. The latest version is shown below — please re-apply your changes.")}}
 {{end}}
-{{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
+{{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
 
-<div class="detail-columns">
-  <div class="card form-card">
-    <h1>Edit card</h1>
+<div class="panel">
+  <div class="panel-header detail-head">
+    <div>
+      <h1 class="h-panel">{{if $d.Editing}}Edit Card{{else}}Card Details{{end}}</h1>
+      <p class="detail-meta">{{$c.DeckName}}</p>
+    </div>
+    <div class="pill-actions">
+      {{if $d.Editing}}
+      <a class="btn btn-sm btn-secondary" href="/cards/{{$c.ID}}">{{template "icon-eye"}}View</a>
+      {{else}}
+      <a class="btn btn-sm btn-secondary" href="/cards/{{$c.ID}}?edit=1">{{template "icon-pencil"}}Edit</a>
+      {{end}}
+      <form method="post" action="/cards/{{$c.ID}}/delete"
+            data-confirm-title="Delete Card?"
+            data-confirm="Delete this card? This cannot be undone.">
+        <input type="hidden" name="redirect" value="/decks/{{$c.DeckID}}">
+        <button type="submit" class="btn btn-sm btn-soft-danger">{{template "icon-trash"}}Delete</button>
+      </form>
+    </div>
+  </div>
+
+  {{if $d.Editing}}
+  {{/* ---------- Edit mode ---------- */}}
+  <div class="panel-section">
     <form method="post" action="/cards/{{$c.ID}}" class="stack">
       <input type="hidden" name="version" value="{{$c.Version}}">
-      <label class="field">
-        <span class="label">Deck *</span>
-        <select class="input select" name="deckId" required>
+      <div class="field">
+        <label class="label" for="f-deck">Deck</label>
+        <select class="input select" id="f-deck" name="deckId" required>
           {{range $topic := $d.Topics}}
           <optgroup label="{{$topic.Name}}">
             {{range $d.Decks}}{{if eq .TopicID $topic.ID}}
@@ -27,66 +48,118 @@
           </optgroup>
           {{end}}
         </select>
-      </label>
-      <label class="field">
-        <span class="label">Front *</span>
-        <textarea class="input" name="front" rows="2" data-autoresize required>{{$c.Front}}</textarea>
-      </label>
-      <label class="field">
-        <span class="label">Back *</span>
-        <textarea class="input" name="back" rows="2" data-autoresize required>{{$c.Back}}</textarea>
-      </label>
-      <label class="field">
-        <span class="label">Note</span>
-        <textarea class="input" name="note" rows="2" data-autoresize>{{deref $c.Note}}</textarea>
-      </label>
-      <div class="field">
-        <span class="label">Priority *</span>
-        <div class="radio-row">
-          <label class="radio-pill"><input type="radio" name="priority" value="A" {{if eq $c.Priority "A"}}checked{{end}}><span class="badge badge-a">A</span> High</label>
-          <label class="radio-pill"><input type="radio" name="priority" value="B" {{if eq $c.Priority "B"}}checked{{end}}><span class="badge badge-b">B</span> Medium</label>
-          <label class="radio-pill"><input type="radio" name="priority" value="C" {{if eq $c.Priority "C"}}checked{{end}}><span class="badge badge-c">C</span> Low</label>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label class="label" for="f-front">Front</label>
+          <textarea class="input" id="f-front" name="front" rows="4" required>{{$c.Front}}</textarea>
+        </div>
+        <div class="field">
+          <label class="label" for="f-back">Back</label>
+          <textarea class="input" id="f-back" name="back" rows="4" required>{{$c.Back}}</textarea>
         </div>
       </div>
+      <div class="field">
+        <label class="label" for="f-note">Note</label>
+        <textarea class="input" id="f-note" name="note" rows="2" data-autoresize>{{deref $c.Note}}</textarea>
+      </div>
+      <fieldset class="field">
+        <legend class="label">Priority</legend>
+        <div class="radio-row">
+          <label class="radio-item"><input type="radio" name="priority" value="A" {{if eq $c.Priority "A"}}checked{{end}}><span class="check-label">A (High)</span></label>
+          <label class="radio-item"><input type="radio" name="priority" value="B" {{if eq $c.Priority "B"}}checked{{end}}><span class="check-label">B (Medium)</span></label>
+          <label class="radio-item"><input type="radio" name="priority" value="C" {{if eq $c.Priority "C"}}checked{{end}}><span class="check-label">C (Low)</span></label>
+        </div>
+      </fieldset>
       <div class="field" data-tag-input>
-        <span class="label">Tags <span class="hint">press Enter or comma to add</span></span>
-        <div class="tag-chips"></div>
-        <input class="input" type="text" data-tag-entry placeholder="Add a tag…">
+        <span class="label">Tags (Optional)</span>
+        <div class="tag-entry-row">
+          <div class="tag-chips"></div>
+          <input class="input tag-entry" type="text" data-tag-entry placeholder="Add a tag…">
+        </div>
+        <p class="field-help">Press Enter or comma to add a tag.</p>
         <input type="hidden" name="tags" value="{{joinTags $c.Tags}}">
       </div>
-      <div class="actions-row">
-        <button type="submit" class="btn btn-primary">Save changes</button>
-        <a class="btn btn-secondary" href="/decks/{{$c.DeckID}}">Cancel</a>
+      <div class="actions-end">
+        <a class="btn btn-secondary" href="/cards/{{$c.ID}}">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <span class="btn-label">Save Changes</span>
+          <span class="btn-busy">Saving…</span>
+        </button>
       </div>
     </form>
   </div>
 
-  <div class="stack side-column">
-    {{range $c.Schedules}}
-    {{if or (not .IsReversed) $c.IsBidirectional}}
-    <div class="card">
-      <h2 class="card-title">{{if .IsReversed}}Reverse{{else}}Forward{{end}} study progress</h2>
-      <dl class="stats-dl">
-        <div><dt>Last seen</dt><dd>{{formatDatePtr .LastSeen}}</dd></div>
-        <div><dt>Last grade</dt><dd>{{if .Grade}}{{.Grade}}{{else}}—{{end}}</dd></div>
-        <div><dt>Repetitions</dt><dd>{{.RepCount}}</dd></div>
-        <div><dt>Easiness</dt><dd>{{printf "%.2f" .Easiness}}</dd></div>
-        <div><dt>Interval</dt><dd>{{.Interval}} day{{if ne .Interval 1}}s{{end}}</dd></div>
-      </dl>
-      <form method="post" action="/schedules/{{.ID}}/reset" data-confirm="Reset this direction's study progress to the initial state?">
-        <button type="submit" class="btn btn-secondary btn-sm">Reset progress</button>
-      </form>
+  {{else}}
+  {{/* ---------- View mode ---------- */}}
+  <div class="panel-section">
+    <dl class="config-grid config-grid-4">
+      <div>
+        <dt>Topic</dt>
+        <dd>{{$c.TopicName}}</dd>
+      </div>
+      <div>
+        <dt>Deck</dt>
+        <dd><a class="entity-link" href="/decks/{{$c.DeckID}}">{{$c.DeckName}}</a></dd>
+      </div>
+      <div>
+        <dt>Priority</dt>
+        <dd>{{template "priority_badge" $c.Priority}}</dd>
+      </div>
+      <div>
+        <dt>Last Studied</dt>
+        <dd>{{with $c.ForwardSchedule}}{{formatDatePtr .LastSeen}}{{else}}Never{{end}}</dd>
+      </div>
+    </dl>
+
+    <div class="content-card">
+      <h3>Front</h3>
+      <p>{{$c.Front}}</p>
     </div>
-    {{end}}
+    <div class="content-card">
+      <h3>Back</h3>
+      <p>{{$c.Back}}</p>
+    </div>
+    {{with $c.Note}}
+    <div class="note-card">
+      <h3>Note</h3>
+      <p>{{.}}</p>
+    </div>
     {{end}}
 
-    <div class="card">
-      <h2 class="card-title">Danger zone</h2>
-      <form method="post" action="/cards/{{$c.ID}}/delete" data-confirm="Delete this card? This cannot be undone.">
-        <input type="hidden" name="redirect" value="/decks/{{$c.DeckID}}">
-        <button type="submit" class="btn btn-danger">{{template "icon-trash"}} Delete card</button>
-      </form>
+    {{if $c.Tags}}
+    <div class="tag-row">
+      {{template "icon-tag"}}
+      {{range $c.Tags}}<span class="tag">{{.}}</span>{{end}}
+    </div>
+    {{end}}
+  </div>
+
+  <div class="panel-section">
+    <div class="sm2-block">
+      <h3 class="sm2-heading">SM-2 Parameters</h3>
+      {{range $c.Schedules}}
+      {{if or (not .IsReversed) $c.IsBidirectional}}
+      <div class="sm2-direction">
+        <div class="sm2-direction-head">
+          <h4>{{if .IsReversed}}Reversed (back → front){{else}}Forward (front → back){{end}}</h4>
+          <form method="post" action="/schedules/{{.ID}}/reset"
+                data-confirm-title="Reset Progress?"
+                data-confirm="Reset this direction's study progress to the initial state?">
+            <button type="submit" class="btn btn-xs btn-soft-warning">{{template "icon-rotate-ccw"}}Reset Progress</button>
+          </form>
+        </div>
+        <dl class="config-grid config-grid-4">
+          <div><dt>Repetitions</dt><dd>{{.RepCount}}</dd></div>
+          <div><dt>Easiness</dt><dd>{{printf "%.2f" .Easiness}}</dd></div>
+          <div><dt>Interval</dt><dd>{{.Interval}} day{{if ne .Interval 1}}s{{end}}</dd></div>
+          <div><dt>Last Grade</dt><dd>{{if .Grade}}{{.Grade}}{{else}}—{{end}}</dd></div>
+        </dl>
+      </div>
+      {{end}}
+      {{end}}
     </div>
   </div>
+  {{end}}
 </div>
 {{end}}

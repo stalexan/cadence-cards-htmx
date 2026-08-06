@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{block "title" .}}Cadence Cards{{end}}</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="/static/favicon.svg?v={{.AssetVersion}}" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css?v={{.AssetVersion}}">
 </head>
-<body class="auth-body">
+{{/* No white card — the reference puts the form straight onto the page
+     background, centred in a max-w-md column. */}}
+<body>
   <main class="auth-main">
-    <div class="auth-card">
-      <h1 class="auth-brand">Cadence Cards</h1>
+    <div class="auth-col">
       {{template "content" .}}
     </div>
   </main>

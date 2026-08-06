@@ -1,65 +1,90 @@
 {{define "title"}}Study setup — Cadence Cards{{end}}
 {{define "content"}}
 {{$d := .Data}}
-<div class="page-header">
-  <a class="back-link" href="/study">{{template "icon-arrow-left"}} Study</a>
+<div class="back-link-row">
+  <a class="back-link" href="/study">{{template "icon-arrow-left"}}Study</a>
 </div>
-<div class="page-header">
-  <h1>Study {{$d.Topic.Name}}</h1>
-</div>
-
-<div class="card study-stats">
-  <div class="stat-inline"><strong>{{$d.Stats.TotalCards}}</strong> cards</div>
-  <div class="stat-inline"><strong>{{$d.Stats.DueTotal}}</strong> due</div>
-  <div class="stat-inline"><span class="badge badge-a">A</span> {{$d.Stats.DueA}}</div>
-  <div class="stat-inline"><span class="badge badge-b">B</span> {{$d.Stats.DueB}}</div>
-  <div class="stat-inline"><span class="badge badge-c">C</span> {{$d.Stats.DueC}}</div>
-</div>
+<h1 class="setup-title">Study: {{$d.Topic.Name}}</h1>
+<p class="setup-sub">Configure your study session</p>
 
 {{/* A plain GET form: checkboxes named deckIds naturally produce repeated
      query params, all of which the server honors. */}}
-<form class="card form-card stack" method="get" action="/study/{{$d.Topic.ID}}">
-  <div class="field">
-    <span class="label">Decks <span class="hint">none selected = all decks</span></span>
-    <div class="actions-row">
-      <button type="button" class="btn btn-ghost btn-sm" data-check-all="deckIds" data-check-state="on">Select all</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-check-all="deckIds" data-check-state="off">Clear</button>
+<form method="get" action="/study/{{$d.Topic.ID}}">
+  <div class="setup-grid">
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Due Cards</h2>
+        <div class="due-rows">
+          <div class="due-row"><span class="badge badge-a">A</span><span class="due-row-label">High priority</span><strong>{{$d.Stats.DueA}}</strong></div>
+          <div class="due-row"><span class="badge badge-b">B</span><span class="due-row-label">Medium priority</span><strong>{{$d.Stats.DueB}}</strong></div>
+          <div class="due-row"><span class="badge badge-c">C</span><span class="due-row-label">Low priority</span><strong>{{$d.Stats.DueC}}</strong></div>
+        </div>
+        <div class="due-total">
+          <span>Total Due</span>
+          <strong>{{$d.Stats.DueTotal}}</strong>
+        </div>
+      </div>
     </div>
-    <div class="check-list">
-      {{range $d.Decks}}
-      <label class="check-field">
-        <input type="checkbox" name="deckIds" value="{{.ID}}" checked>
-        <span>{{.Name}} <span class="hint">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</span></span>
-      </label>
-      {{end}}
+
+    <div class="panel">
+      <div class="panel-body">
+        <div class="setup-head">
+          <h2>Select Decks</h2>
+          <div class="text-actions">
+            <button type="button" class="text-action" data-check-all="deckIds" data-check-state="on">All</button>
+            <span class="text-action-sep">|</span>
+            <button type="button" class="text-action" data-check-all="deckIds" data-check-state="off">None</button>
+          </div>
+        </div>
+        <div class="check-list">
+          {{range $d.Decks}}
+          <label class="check-field">
+            <input type="checkbox" name="deckIds" value="{{.ID}}" checked>
+            <span class="check-label">{{.Name}} <span class="check-count">({{.CardCount}} card{{if ne .CardCount 1}}s{{end}})</span></span>
+          </label>
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Options</h2>
+        <div class="stack setup-options">
+          <div class="field">
+            <label class="label" for="f-priority">Priority</label>
+            <select class="input select" id="f-priority" name="priority">
+              <option value="">All priorities</option>
+              <option value="A">A — High only</option>
+              <option value="B">B — Medium only</option>
+              <option value="C">C — Low only</option>
+            </select>
+          </div>
+          {{/* When unchecked, app.js enables the hidden includeNew=false input
+               on submit (an unchecked checkbox sends nothing). */}}
+          <label class="check-field">
+            <input type="checkbox" id="f-new" data-mirror-unchecked="includeNew" checked>
+            <span class="check-label">Include new (never-studied) cards</span>
+          </label>
+          <input type="hidden" name="includeNew" value="false" disabled>
+          <div class="field">
+            <label class="label" for="f-limit">Card limit</label>
+            <select class="input select" id="f-limit" name="limit">
+              <option value="">No limit</option>
+              <option value="10">10 cards</option>
+              <option value="20" selected>20 cards</option>
+              <option value="30">30 cards</option>
+              <option value="50">50 cards</option>
+              <option value="100">100 cards</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <label class="field">
-    <span class="label">Priority</span>
-    <select class="input select" name="priority">
-      <option value="">All priorities</option>
-      <option value="A">A — High only</option>
-      <option value="B">B — Medium only</option>
-      <option value="C">C — Low only</option>
-    </select>
-  </label>
-
-  {{/* When unchecked, app.js enables the hidden includeNew=false input on
-       submit (an unchecked checkbox sends nothing). */}}
-  <label class="check-field">
-    <input type="checkbox" data-mirror-unchecked="includeNew" checked>
-    <span>Include new (never-studied) cards</span>
-  </label>
-  <input type="hidden" name="includeNew" value="false" disabled>
-
-  <label class="field">
-    <span class="label">Card limit <span class="hint">blank = no limit</span></span>
-    <input class="input input-sm" type="number" name="limit" min="1" placeholder="20">
-  </label>
-
-  <div class="actions-row">
-    <button type="submit" class="btn btn-primary">{{template "icon-play"}} Start session</button>
+  <div class="setup-cta">
+    <button type="submit" class="btn btn-lg btn-primary">{{template "icon-play"}} Start Study Session</button>
   </div>
 </form>
 {{end}}

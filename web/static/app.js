@@ -18,10 +18,21 @@
   });
 
   // ----- Copy to clipboard with a 2s checkmark -----
+  // data-copy carries the text inline; data-copy-target names an element whose
+  // current value is copied instead (the share dialog's YAML textarea, which is
+  // only populated once htmx has fetched it).
   document.addEventListener("click", function (e) {
-    var btn = e.target.closest("[data-copy]");
+    var btn = e.target.closest("[data-copy], [data-copy-target]");
     if (!btn) return;
-    navigator.clipboard.writeText(btn.getAttribute("data-copy")).then(function () {
+    var text;
+    if (btn.hasAttribute("data-copy-target")) {
+      var src = document.querySelector(btn.getAttribute("data-copy-target"));
+      if (!src) return;
+      text = "value" in src ? src.value : src.textContent;
+    } else {
+      text = btn.getAttribute("data-copy");
+    }
+    navigator.clipboard.writeText(text).then(function () {
       var original = btn.innerHTML;
       btn.innerHTML =
         '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5.5 5.5L20 6.5"/></svg>';
@@ -41,6 +52,17 @@
     (root || document).querySelectorAll("[data-autoresize]").forEach(autoresize);
   }
 
+  // ----- Submit busy state -----
+  // Flags the form so CSS can swap .btn-label for .btn-busy. Skipped while a
+  // confirm dialog is still pending, otherwise the button would read "Saving…"
+  // behind an unanswered "Are you sure?".
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (form.matches("[data-confirm]") && !form.dataset.confirmed) return;
+    form.dataset.busy = "1";
+  });
+
   // ----- Confirm dialog for destructive forms (data-confirm) -----
   document.addEventListener("submit", function (e) {
     var form = e.target;
@@ -56,6 +78,10 @@
       return;
     }
     dialog.querySelector("#confirm-dialog-message").textContent = form.getAttribute("data-confirm");
+    // Optional per-action heading ("Delete Topic?"); falls back to the generic
+    // one so forms without the attribute keep working.
+    var title = dialog.querySelector("#confirm-dialog-title");
+    if (title) title.textContent = form.getAttribute("data-confirm-title") || "Are you sure?";
     dialog.returnValue = "";
     dialog.showModal();
     var ok = dialog.querySelector("#confirm-dialog-ok");

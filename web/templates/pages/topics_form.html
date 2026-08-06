@@ -4,50 +4,61 @@
 {{$t := $d.Topic}}
 {{/* On validation errors re-show the submitted values; otherwise the topic's. */}}
 {{$v := $d.Params}}
-{{if and $t (not $d.Error)}}{{end}}
-<div class="page-header">
-  <a class="back-link" href="/topics">{{template "icon-arrow-left"}} Topics</a>
+<div class="back-link-row">
+  <a class="back-link" href="/topics">{{template "icon-arrow-left"}}Topics</a>
 </div>
-<div class="card form-card">
-  <h1>{{if $t}}Edit topic{{else}}New topic{{end}}</h1>
-  {{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
-  <form method="post" action="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}" class="stack">
-    <label class="field">
-      <span class="label">Name *</span>
-      <input class="input" type="text" name="name" required
-             value="{{if $v.Name}}{{$v.Name}}{{else if $t}}{{$t.Name}}{{end}}">
-    </label>
-    <fieldset class="fieldset">
-      <legend>Claude assistant configuration <span class="hint">(all optional)</span></legend>
-      <label class="field">
-        <span class="label">Description</span>
-        <textarea class="input" name="topicDescription" rows="2" data-autoresize placeholder="What this topic covers">{{if $v.TopicDescription}}{{deref $v.TopicDescription}}{{else if $t}}{{deref $t.TopicDescription}}{{end}}</textarea>
-      </label>
-      <label class="field">
-        <span class="label">Expertise <span class="hint">e.g. “tutor”, “language teacher”</span></span>
-        <input class="input" type="text" name="expertise" value="{{if $v.Expertise}}{{deref $v.Expertise}}{{else if $t}}{{deref $t.Expertise}}{{end}}">
-      </label>
-      <label class="field">
-        <span class="label">Focus <span class="hint">e.g. “vocabulary and grammar”</span></span>
-        <input class="input" type="text" name="focus" value="{{if $v.Focus}}{{deref $v.Focus}}{{else if $t}}{{deref $t.Focus}}{{end}}">
-      </label>
-      <label class="field">
-        <span class="label">Context type <span class="hint">e.g. “usage examples”</span></span>
-        <input class="input" type="text" name="contextType" value="{{if $v.ContextType}}{{deref $v.ContextType}}{{else if $t}}{{deref $t.ContextType}}{{end}}">
-      </label>
-      <label class="field">
-        <span class="label">Example interaction</span>
-        <textarea class="input" name="example" rows="3" data-autoresize placeholder="An example H/A exchange for the assistant">{{if $v.Example}}{{deref $v.Example}}{{else if $t}}{{deref $t.Example}}{{end}}</textarea>
-      </label>
-      <label class="field">
-        <span class="label">Question guidance <span class="hint">extra instructions for generated questions</span></span>
-        <textarea class="input" name="question" rows="2" data-autoresize>{{if $v.Question}}{{deref $v.Question}}{{else if $t}}{{deref $t.Question}}{{end}}</textarea>
-      </label>
-    </fieldset>
-    <div class="actions-row">
-      <button type="submit" class="btn btn-primary">{{if $t}}Save changes{{else}}Create topic{{end}}</button>
-      <a class="btn btn-secondary" href="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}">Cancel</a>
-    </div>
-  </form>
+<div class="panel form-card">
+  <div class="panel-body">
+    <h1 class="h-form">{{if $t}}Edit Topic{{else}}New Topic{{end}}</h1>
+    {{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
+    <form method="post" action="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}" class="stack">
+      <div class="field">
+        <label class="label" for="f-name">Topic Name</label>
+        <input class="input" id="f-name" type="text" name="name" required
+               value="{{if $v.Name}}{{$v.Name}}{{else if $t}}{{$t.Name}}{{end}}">
+      </div>
+      <div class="field">
+        <label class="label" for="f-desc">Topic Description</label>
+        <input class="input" id="f-desc" type="text" name="topicDescription"
+               value="{{if $v.TopicDescription}}{{deref $v.TopicDescription}}{{else if $t}}{{deref $t.TopicDescription}}{{end}}">
+        <p class="field-help">A more specific description of the topic area.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-expertise">Expertise</label>
+        <input class="input" id="f-expertise" type="text" name="expertise"
+               value="{{if $v.Expertise}}{{deref $v.Expertise}}{{else if $t}}{{deref $t.Expertise}}{{end}}">
+        <p class="field-help">The role Claude should take when tutoring this topic.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-focus">Focus</label>
+        <input class="input" id="f-focus" type="text" name="focus"
+               value="{{if $v.Focus}}{{deref $v.Focus}}{{else if $t}}{{deref $t.Focus}}{{end}}">
+        <p class="field-help">What aspects of the topic to emphasize in tutoring.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-context">Context Type</label>
+        <input class="input" id="f-context" type="text" name="contextType"
+               value="{{if $v.ContextType}}{{deref $v.ContextType}}{{else if $t}}{{deref $t.ContextType}}{{end}}">
+        <p class="field-help">The kind of context Claude should supply, e.g. usage examples.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-example">Examples</label>
+        <textarea class="input" id="f-example" name="example" rows="10">{{if $v.Example}}{{deref $v.Example}}{{else if $t}}{{deref $t.Example}}{{end}}</textarea>
+        <p class="field-help">An example exchange showing how the assistant should respond.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-question">Question Prompt</label>
+        <textarea class="input" id="f-question" name="question" rows="10">{{if $v.Question}}{{deref $v.Question}}{{else if $t}}{{deref $t.Question}}{{end}}</textarea>
+        <p class="field-help">Extra instructions for the questions Claude generates.</p>
+      </div>
+      <div class="actions-end">
+        <a class="btn btn-secondary" href="{{if $t}}/topics/{{$t.ID}}{{else}}/topics{{end}}">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <span class="btn-label">{{if $t}}Save Changes{{else}}Create Topic{{end}}</span>
+          <span class="btn-busy">{{if $t}}Saving…{{else}}Creating…{{end}}</span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 {{end}}

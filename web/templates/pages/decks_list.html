@@ -2,27 +2,7 @@
 {{define "content"}}
 <div class="page-header">
   <h1>Decks</h1>
-  <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} New deck</a>
+  <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} New Deck</a>
 </div>
-{{if .Data}}
-<div class="card-grid">
-  {{range .Data}}
-  <div class="card entity-card">
-    <a class="entity-title" href="/decks/{{.ID}}">{{.Name}}</a>
-    <p class="muted">{{.TopicName}} · {{.CardCount}} card{{if ne .CardCount 1}}s{{end}}{{if .IsBidirectional}} · bidirectional{{end}}</p>
-    <div class="row-actions">
-      <a class="btn btn-ghost btn-icon" href="/decks/{{.ID}}/edit" title="Edit">{{template "icon-pencil"}}</a>
-      <form method="post" action="/decks/{{.ID}}/delete" data-confirm="Delete deck “{{.Name}}” and all of its cards?">
-        <button type="submit" class="btn btn-ghost btn-icon btn-danger-icon" title="Delete">{{template "icon-trash"}}</button>
-      </form>
-    </div>
-  </div>
-  {{end}}
-</div>
-{{else}}
-<div class="empty card">
-  <p>No decks yet. A deck holds cards within a topic.</p>
-  <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} Create your first deck</a>
-</div>
-{{end}}
+{{template "deck_grid" .Data}}
 {{end}}

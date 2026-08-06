@@ -295,20 +295,41 @@ func (s *Store) CountDue(ctx context.Context, userID, topicID int64, f StudyFilt
 	return total, nil
 }
 
+// DueByPriority is a topic's due counts split by card priority, plus the total.
+type DueByPriority struct {
+	A     int
+	B     int
+	C     int
+	Total int
+}
+
 // TopicDueCounts returns due study-item counts per topic for the study index
-// page, keyed by topic ID.
-func (s *Store) TopicDueCounts(ctx context.Context, userID int64, now time.Time) (map[int64]int, error) {
+// page, keyed by topic ID. The split is per priority because the index shows
+// a chip per non-empty priority alongside the total.
+func (s *Store) TopicDueCounts(ctx context.Context, userID int64, now time.Time) (map[int64]DueByPriority, error) {
 	topics, err := s.ListTopics(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	counts := make(map[int64]int, len(topics))
+	counts := make(map[int64]DueByPriority, len(topics))
 	for _, t := range topics {
-		n, err := s.CountDue(ctx, userID, t.ID, StudyFilter{IncludeNew: true}, now)
-		if err != nil {
-			return nil, err
+		var d DueByPriority
+		for _, p := range sm2.Priorities {
+			n, err := s.CountDue(ctx, userID, t.ID, StudyFilter{Priority: string(p), IncludeNew: true}, now)
+			if err != nil {
+				return nil, err
+			}
+			switch p {
+			case sm2.PriorityA:
+				d.A = n
+			case sm2.PriorityB:
+				d.B = n
+			case sm2.PriorityC:
+				d.C = n
+			}
+			d.Total += n
 		}
-		counts[t.ID] = n
+		counts[t.ID] = d
 	}
 	return counts, nil
 }

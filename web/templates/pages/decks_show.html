@@ -2,33 +2,78 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$deck := $d.Deck}}
-<div class="page-header">
-  <a class="back-link" href="/decks">{{template "icon-arrow-left"}} Decks</a>
-</div>
-<div class="page-header">
-  <div>
-    <h1>{{$deck.Name}}</h1>
-    <p class="muted">{{$deck.TopicName}} · {{$deck.CardCount}} card{{if ne $deck.CardCount 1}}s{{end}}{{if $deck.IsBidirectional}} · bidirectional{{end}}</p>
-  </div>
-  <div class="actions-row">
-    <a class="btn btn-secondary" href="/decks/{{$deck.ID}}/edit">{{template "icon-pencil"}} Edit</a>
-    <button type="button" class="btn btn-secondary" data-open-dialog="#share-dialog">{{template "icon-download"}} Share / Export</button>
-    <a class="btn btn-primary" href="/cards/new?deckId={{$deck.ID}}">{{template "icon-plus"}} New card</a>
-  </div>
+<div class="back-link-row">
+  <a class="back-link" href="/decks">{{template "icon-arrow-left"}}Decks</a>
 </div>
 
-{{template "card_table" $d.Table}}
+<div class="stack-6">
+  <div class="panel">
+    <div class="panel-header detail-head">
+      <div>
+        <h1 class="h-panel">{{$deck.Name}}</h1>
+        <p class="detail-meta">
+          <a class="entity-link" href="/topics/{{$deck.TopicID}}">{{$deck.TopicName}}</a>
+          · Created on {{formatDate $deck.CreatedAt}}
+        </p>
+      </div>
+      <div class="pill-actions">
+        <button type="button" class="btn btn-sm btn-primary" data-open-dialog="#share-dialog">{{template "icon-share"}}Share</button>
+        <a class="btn btn-sm btn-soft-success" href="/study/{{$deck.TopicID}}/setup">{{template "icon-book-open"}}Study</a>
+        <a class="btn btn-sm btn-secondary" href="/decks/{{$deck.ID}}/edit">{{template "icon-pencil"}}Edit</a>
+        <form method="post" action="/decks/{{$deck.ID}}/delete"
+              data-confirm-title="Delete Deck?"
+              data-confirm="Delete deck “{{$deck.Name}}” and all of its cards?">
+          <button type="submit" class="btn btn-sm btn-soft-danger">{{template "icon-trash"}}Delete</button>
+        </form>
+      </div>
+    </div>
 
-<dialog id="share-dialog" class="share-dialog">
-  <h2>Export “{{$deck.Name}}”</h2>
-  <p class="muted">Download the deck as YAML. It can be re-imported here or into another Cadence Cards instance.</p>
-  <label class="check-field">
-    <input type="checkbox" id="share-include-sm2" data-export-toggle data-export-base="/decks/{{$deck.ID}}/export">
-    <span>Include SM-2 study progress</span>
-  </label>
-  <div class="dialog-actions">
-    <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
+    <div class="panel-section">
+      <h2 class="config-heading">Deck Settings</h2>
+      {{/* FieldLabels() returns two values, which templates can't call — so the
+           "Front"/"Back" fallbacks are spelled out here instead. */}}
+      <dl class="config-grid config-grid-3">
+        <div>
+          <dt>Field 1 Label</dt>
+          <dd>{{if $deck.Field1Label}}{{deref $deck.Field1Label}}{{else}}Front{{end}}</dd>
+        </div>
+        <div>
+          <dt>Field 2 Label</dt>
+          <dd>{{if $deck.Field2Label}}{{deref $deck.Field2Label}}{{else}}Back{{end}}</dd>
+        </div>
+        <div>
+          <dt>Bidirectional Study</dt>
+          <dd>{{if $deck.IsBidirectional}}Enabled — cards are also studied back→front{{else}}Disabled{{end}}</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  {{template "card_table" $d.Table}}
+</div>
+
+<dialog id="share-dialog" class="dialog dialog-2xl">
+  <div class="dialog-body">
+    <h3 class="dialog-title">Export “{{$deck.Name}}”</h3>
+    <div class="dialog-content">
+      <p class="dialog-message">Download the deck as YAML, or copy it below. It can be re-imported here or into another Cadence Cards instance.</p>
+      <label class="check-field share-toggle">
+        <input type="checkbox" id="share-include-sm2" name="includeSm2Params" value="true"
+               data-export-toggle data-export-base="/decks/{{$deck.ID}}/export"
+               hx-get="/decks/{{$deck.ID}}/export-preview" hx-target="#share-yaml" hx-swap="innerHTML"
+               hx-trigger="change">
+        <span class="check-label">Include SM-2 study progress</span>
+      </label>
+      {{/* "revealed" rather than "load": a closed <dialog> is display:none and
+           never intersects, so the YAML is only built when the dialog opens. */}}
+      <textarea class="input mono share-yaml" id="share-yaml" readonly rows="14"
+                hx-get="/decks/{{$deck.ID}}/export-preview" hx-trigger="revealed" hx-swap="innerHTML"></textarea>
+    </div>
+  </div>
+  <div class="dialog-footer">
     <a class="btn btn-primary" id="share-download" href="/decks/{{$deck.ID}}/export" download>{{template "icon-download"}} Download YAML</a>
+    <button type="button" class="btn btn-secondary" data-copy-target="#share-yaml">{{template "icon-clipboard"}} Copy</button>
+    <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
   </div>
 </dialog>
 {{end}}

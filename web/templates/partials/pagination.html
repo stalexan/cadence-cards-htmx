@@ -1,21 +1,67 @@
-{{/* Pagination controls for the card table. Context: cardTableData. */}}
+{{/* Pagination for the card table. Context: cardTableData.
+
+     Two trees like the reference: a Prev / "n of m" / Next row below sm, and
+     the numbered button group above it. Page numbers come from .PageWindow
+     (0 = ellipsis), a Go port of the reference's visiblePages(). */}}
 {{define "pagination"}}
 {{if gt .TotalPages 1}}
-<nav class="pagination" aria-label="Pagination">
-  {{$d := .}}
-  {{if gt .Page 1}}
-  <button class="btn btn-secondary btn-sm"
-          hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}"
-          hx-target="#card-table" hx-swap="outerHTML"
-          hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}">Previous</button>
-  {{end}}
-  <span class="pagination-info">Page {{.Page}} of {{.TotalPages}}</span>
-  {{if lt .Page .TotalPages}}
-  <button class="btn btn-secondary btn-sm"
-          hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (add .Page 1))}}"
-          hx-target="#card-table" hx-swap="outerHTML"
-          hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (add .Page 1))}}">Next</button>
-  {{end}}
-</nav>
+{{$d := .}}
+<div class="pagination">
+  <div class="pagination-mobile">
+    <button class="btn btn-secondary" {{if le .Page 1}}disabled{{end}}
+            hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}"
+            hx-target="#card-table" hx-swap="outerHTML"
+            hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}">Previous</button>
+    <span class="pagination-summary">{{.Page}} / {{.TotalPages}}</span>
+    <button class="btn btn-secondary" {{if ge .Page .TotalPages}}disabled{{end}}
+            hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (add .Page 1))}}"
+            hx-target="#card-table" hx-swap="outerHTML"
+            hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (add .Page 1))}}">Next</button>
+  </div>
+
+  <div class="pagination-desktop">
+    <p class="pagination-summary">
+      Showing <strong>{{.StartItem}}</strong> to <strong>{{.EndItem}}</strong> of <strong>{{.Total}}</strong> results
+    </p>
+    <nav class="page-nav" aria-label="Pagination">
+      <button class="page-btn page-btn-arrow" title="First page" {{if le .Page 1}}disabled{{end}}
+              hx-get="{{.BasePath}}{{.QueryString "page" "1"}}"
+              hx-target="#card-table" hx-swap="outerHTML"
+              hx-push-url="{{.PushURL}}{{.QueryString "page" "1"}}">
+        <span class="sr-only">First</span>{{template "icon-chevrons-left"}}
+      </button>
+      <button class="page-btn page-btn-arrow" title="Previous page" {{if le .Page 1}}disabled{{end}}
+              hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}"
+              hx-target="#card-table" hx-swap="outerHTML"
+              hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (sub .Page 1))}}">
+        <span class="sr-only">Previous</span>{{template "icon-chevron-left"}}
+      </button>
+
+      {{range .PageWindow}}
+      {{if eq . 0}}
+      <span class="page-btn page-ellipsis">…</span>
+      {{else}}
+      <button class="page-btn{{if eq . $d.Page}} page-btn-current{{end}}"
+              hx-get="{{$d.BasePath}}{{$d.QueryString "page" (printf "%d" .)}}"
+              hx-target="#card-table" hx-swap="outerHTML"
+              hx-push-url="{{$d.PushURL}}{{$d.QueryString "page" (printf "%d" .)}}">{{.}}</button>
+      {{end}}
+      {{end}}
+
+      <button class="page-btn page-btn-arrow" title="Next page" {{if ge .Page .TotalPages}}disabled{{end}}
+              hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" (add .Page 1))}}"
+              hx-target="#card-table" hx-swap="outerHTML"
+              hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" (add .Page 1))}}">
+        <span class="sr-only">Next</span>{{template "icon-chevron-right"}}
+      </button>
+      <button class="page-btn page-btn-arrow" title="Last page" {{if ge .Page .TotalPages}}disabled{{end}}
+              hx-get="{{.BasePath}}{{.QueryString "page" (printf "%d" .TotalPages)}}"
+              hx-target="#card-table" hx-swap="outerHTML"
+              hx-push-url="{{.PushURL}}{{.QueryString "page" (printf "%d" .TotalPages)}}">
+        <span class="sr-only">Last</span>{{template "icon-chevrons-right"}}
+      </button>
+    </nav>
+  </div>
+</div>
 {{end}}
 {{end}}

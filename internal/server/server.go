@@ -91,6 +91,7 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("POST /topics/{id}/delete", auth(s.handleTopicDelete))
 
 	mux.HandleFunc("GET /decks", auth(s.handleDecksList))
+	mux.HandleFunc("GET /decks/grid", auth(s.handleDecksGridFragment))
 	mux.HandleFunc("GET /decks/new", auth(s.handleDeckNewPage))
 	mux.HandleFunc("POST /decks", auth(s.handleDeckCreate))
 	mux.HandleFunc("GET /decks/{id}", auth(s.handleDeckShow))
@@ -98,10 +99,12 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("POST /decks/{id}", auth(s.handleDeckUpdate))
 	mux.HandleFunc("POST /decks/{id}/delete", auth(s.handleDeckDelete))
 	mux.HandleFunc("GET /decks/{id}/export", auth(s.handleDeckExport))
+	mux.HandleFunc("GET /decks/{id}/export-preview", auth(s.handleDeckExportPreview))
 	mux.HandleFunc("GET /decks/{id}/cards", auth(s.handleDeckCardsFragment))
 
 	mux.HandleFunc("GET /cards", auth(s.handleCardsList))
 	mux.HandleFunc("GET /cards/table", auth(s.handleCardsTableFragment))
+	mux.HandleFunc("GET /cards/deck-options", auth(s.handleCardDeckOptions))
 	mux.HandleFunc("GET /cards/new", auth(s.handleCardNewPage))
 	mux.HandleFunc("POST /cards", auth(s.handleCardCreate))
 	mux.HandleFunc("GET /cards/{id}", auth(s.handleCardShow))

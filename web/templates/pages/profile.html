@@ -2,43 +2,70 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$u := .User}}
-<div class="page-header">
-  <h1>Profile</h1>
-</div>
-<div class="detail-columns">
-  <div class="card form-card">
-    <h2 class="card-title">Account</h2>
-    {{if $d.ProfileSaved}}<div class="alert alert-success">Profile updated.</div>{{end}}
-    {{if $d.ProfileError}}<div class="alert alert-error">{{$d.ProfileError}}</div>{{end}}
-    <form method="post" action="/profile" class="stack">
-      <label class="field">
-        <span class="label">Name</span>
-        <input class="input" type="text" name="name" value="{{deref $u.Name}}" required>
-      </label>
-      <label class="field">
-        <span class="label">Email</span>
-        <input class="input" type="email" name="email" value="{{deref $u.Email}}" required>
-      </label>
-      <button type="submit" class="btn btn-primary">Save</button>
-    </form>
+<h1 class="page-title">Profile</h1>
+
+{{/* Single column of two panels — the reference has no side-by-side split. */}}
+<div class="stack-6">
+  <div class="panel">
+    <div class="panel-body">
+      <div class="section-head">
+        {{template "icon-user"}}
+        <h2>Account</h2>
+      </div>
+      {{if $d.ProfileSaved}}{{template "alert_compact" (dict "Kind" "success" "Body" "Profile updated.")}}{{end}}
+      {{if $d.ProfileError}}{{template "alert_compact" (dict "Kind" "error" "Body" $d.ProfileError)}}{{end}}
+      <form method="post" action="/profile">
+        <div class="field-grid">
+          <div class="field">
+            <label class="label" for="f-name">Name</label>
+            <input class="input" id="f-name" type="text" name="name" value="{{deref $u.Name}}" required>
+          </div>
+          <div class="field">
+            <label class="label" for="f-email">Email</label>
+            <input class="input" id="f-email" type="email" name="email" value="{{deref $u.Email}}" required>
+          </div>
+        </div>
+        <p class="member-since">Member since {{formatDate $u.CreatedAt}}</p>
+        <div class="actions-end">
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-label">Save</span>
+            <span class="btn-busy">Saving…</span>
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <div class="card form-card">
-    <h2 class="card-title">Change password</h2>
-    {{if $d.PasswordChanged}}<div class="alert alert-success">Password changed. Other sessions were signed out.</div>{{end}}
-    {{if $d.PasswordError}}<div class="alert alert-error">{{$d.PasswordError}}</div>{{end}}
-    <form method="post" action="/profile/password" class="stack">
-      <label class="field">
-        <span class="label">Current password</span>
-        <input class="input" type="password" name="currentPassword" required autocomplete="current-password">
-      </label>
-      <label class="field">
-        <span class="label">New password</span>
-        <input class="input" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
-        <span class="hint">At least 8 characters. Changing your password signs out other sessions.</span>
-      </label>
-      <button type="submit" class="btn btn-primary">Change password</button>
-    </form>
+  <div class="panel">
+    <div class="panel-body">
+      <div class="section-head">
+        {{template "icon-lock"}}
+        <h2>Change Password</h2>
+      </div>
+      {{if $d.PasswordChanged}}{{template "alert_compact" (dict "Kind" "success" "Body" "Password changed. Other sessions were signed out.")}}{{end}}
+      {{if $d.PasswordError}}{{template "alert_compact" (dict "Kind" "error" "Body" $d.PasswordError)}}{{end}}
+      <form method="post" action="/profile/password" class="stack">
+        <div class="field">
+          <label class="label" for="f-current">Current Password</label>
+          <input class="input" id="f-current" type="password" name="currentPassword" required autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label class="label" for="f-new">New Password</label>
+          <input class="input" id="f-new" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
+          <p class="field-help">At least 8 characters. Changing your password signs out other sessions.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="f-confirm">Confirm New Password</label>
+          <input class="input" id="f-confirm" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="actions-end">
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-label">Change Password</span>
+            <span class="btn-busy">Changing…</span>
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 {{end}}

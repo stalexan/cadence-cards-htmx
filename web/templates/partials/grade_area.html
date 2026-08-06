@@ -1,19 +1,29 @@
 {{/* Grade buttons + Next Card. Swapped (outerHTML) by the grade POST.
-     Context: gradeAreaData (or an equivalent dict from study_card.html). */}}
+     Context: gradeAreaData (or an equivalent dict from study_card.html).
+
+     Vertical stack, best-first, matching the reference — the previous version
+     was a horizontal row of tinted pills, worst-first. */}}
 {{define "grade_area"}}
 {{$p := .Params}}
 <div id="grade-area" class="grade-area">
+  <h3 class="grade-heading">Rate Your Recall</h3>
   {{if .Graded}}
   <div class="grade-buttons">
-    <button class="btn grade-btn grade-incorrect{{if eq .Grade "INCORRECT"}} selected{{end}}" disabled>Incorrect</button>
-    <button class="btn grade-btn grade-hesitation{{if eq .Grade "CORRECT_WITH_HESITATION"}} selected{{end}}" disabled>Correct (hesitated)</button>
-    <button class="btn grade-btn grade-perfect{{if eq .Grade "CORRECT_PERFECT_RECALL"}} selected{{end}}" disabled>Perfect recall</button>
+    <button class="grade-btn{{if eq .Grade "CORRECT_PERFECT_RECALL"}} grade-on-green{{end}}" disabled>
+      {{template "icon-check-circle"}}Perfect Recall<span class="grade-hint">(I knew it immediately)</span>
+    </button>
+    <button class="grade-btn{{if eq .Grade "CORRECT_WITH_HESITATION"}} grade-on-yellow{{end}}" disabled>
+      {{template "icon-help-circle"}}Correct with Hesitation<span class="grade-hint">(I had to think)</span>
+    </button>
+    <button class="grade-btn{{if eq .Grade "INCORRECT"}} grade-on-red{{end}}" disabled>
+      {{template "icon-x-circle"}}Incorrect<span class="grade-hint">(I didn't remember)</span>
+    </button>
   </div>
-  <p class="muted grade-result">Graded. Next review in {{.NewInterval}} day{{if ne .NewInterval 1}}s{{end}}.</p>
+  <p class="grade-note">Graded. Next review in {{.NewInterval}} day{{if ne .NewInterval 1}}s{{end}}.</p>
   <div class="grade-next">
-    <button class="btn btn-primary"
+    <button class="btn btn-primary btn-block"
             hx-get="{{$p.NextURL (add $p.Completed 1)}}"
-            hx-target="#study-area" hx-swap="innerHTML">Next Card</button>
+            hx-target="#study-area" hx-swap="innerHTML">Next Card{{template "icon-arrow-right"}}</button>
   </div>
   {{else}}
   <form class="grade-buttons"
@@ -23,15 +33,21 @@
     <input type="hidden" name="topicId" value="{{$p.TopicID}}">
     <input type="hidden" name="version" value="{{.Version}}">
     {{template "study_params_hidden" (dict "Params" $p "Completed" $p.Completed)}}
-    <button type="submit" name="grade" value="INCORRECT" class="btn grade-btn grade-incorrect">Incorrect</button>
-    <button type="submit" name="grade" value="CORRECT_WITH_HESITATION" class="btn grade-btn grade-hesitation">Correct (hesitated)</button>
-    <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL" class="btn grade-btn grade-perfect">Perfect recall</button>
+    <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL" class="grade-btn">
+      {{template "icon-check-circle"}}Perfect Recall<span class="grade-hint">(I knew it immediately)</span>
+    </button>
+    <button type="submit" name="grade" value="CORRECT_WITH_HESITATION" class="grade-btn">
+      {{template "icon-help-circle"}}Correct with Hesitation<span class="grade-hint">(I had to think)</span>
+    </button>
+    <button type="submit" name="grade" value="INCORRECT" class="grade-btn">
+      {{template "icon-x-circle"}}Incorrect<span class="grade-hint">(I didn't remember)</span>
+    </button>
   </form>
   <div class="grade-next">
-    <button class="btn btn-secondary"
+    <button class="btn btn-secondary btn-block"
             hx-get="{{$p.NextURL $p.Completed}}"
             hx-target="#study-area" hx-swap="innerHTML"
-            hx-confirm="You haven't graded this card yet. Continue anyway?">Next Card</button>
+            hx-confirm="You haven't graded this card yet. Continue anyway?">Skip to Next Card</button>
   </div>
   {{end}}
 </div>
@@ -42,14 +58,17 @@
 {{define "grade_conflict"}}
 {{$p := .Params}}
 <div hx-swap-oob="beforeend:#chat-messages">
-  <div class="chat-msg chat-assistant chat-error">
-    <div class="chat-bubble">This card was updated elsewhere. Refreshing it now — please grade again.</div>
+  <div class="chat-msg chat-assistant">
+    <div class="chat-bubble chat-error">This card was updated elsewhere. Refreshing it now — please grade again.</div>
   </div>
 </div>
 <div id="grade-area" class="grade-area">
-  <div class="muted"
+  <div class="alert alert-compact alert-warning"
        hx-get="{{$p.NextURL $p.Completed}}"
        hx-trigger="load delay:1200ms"
-       hx-target="#study-area" hx-swap="innerHTML">Refreshing card…</div>
+       hx-target="#study-area" hx-swap="innerHTML">
+    {{template "icon-alert-circle"}}
+    <span class="alert-text">Refreshing card…</span>
+  </div>
 </div>
 {{end}}

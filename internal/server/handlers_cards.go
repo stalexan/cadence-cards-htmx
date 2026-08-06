@@ -244,6 +244,60 @@ type cardFormData struct {
 	Error           string
 	VersionConflict bool
 	Now             time.Time
+	// Editing switches cards_show from the read-only view to the edit form.
+	// The reference toggles this in place; here it is a plain ?edit=1
+	// navigation, so the two modes stay separately linkable.
+	Editing bool
+}
+
+// SelectedTopicID is the topic owning the currently selected deck, so the
+// topic select can be pre-set when the form re-renders after a validation
+// error. 0 when nothing is selected yet.
+func (d cardFormData) SelectedTopicID() int64 {
+	for _, deck := range d.Decks {
+		if deck.ID == d.Params.DeckID {
+			return deck.TopicID
+		}
+	}
+	return 0
+}
+
+// DecksForSelectedTopic narrows the deck list to the selected topic. With no
+// topic chosen the deck select starts empty, matching the reference.
+func (d cardFormData) DecksForSelectedTopic() []store.Deck {
+	topicID := d.SelectedTopicID()
+	if topicID == 0 {
+		return nil
+	}
+	var out []store.Deck
+	for _, deck := range d.Decks {
+		if deck.TopicID == topicID {
+			out = append(out, deck)
+		}
+	}
+	return out
+}
+
+// handleCardDeckOptions re-renders just the deck <select> options when the
+// topic select changes. The reference filters this list client-side; doing it
+// server-side keeps the page free of custom JS under the strict CSP.
+func (s *Server) handleCardDeckOptions(w http.ResponseWriter, r *http.Request) {
+	userID := userFrom(r).ID
+	decks, err := s.store.ListDecks(r.Context(), userID, queryInt64Ptr(r, "topicId"))
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.fragment(w, http.StatusOK, "deck_options", deckOptionsData{
+		Decks:    decks,
+		Selected: r.URL.Query().Get("deckId"),
+	})
+}
+
+// deckOptionsData feeds the deck_options partial.
+type deckOptionsData struct {
+	Decks    []store.Deck
+	Selected string
 }
 
 func (s *Server) cardFormData(r *http.Request, card *store.Card, params store.CardParams, errMsg string) (cardFormData, error) {
@@ -318,6 +372,7 @@ func (s *Server) handleCardShow(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	data.Editing = r.URL.Query().Get("edit") != ""
 	s.render(w, r, http.StatusOK, "cards_show", data)
 }
 

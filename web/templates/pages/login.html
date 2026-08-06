@@ -1,19 +1,27 @@
 {{define "title"}}Sign in — Cadence Cards{{end}}
 {{define "content"}}
 {{$d := .Data}}
-<h2 class="auth-title">Sign in</h2>
-{{if $d.Registered}}<div class="alert alert-success">Account created. You can sign in now.</div>{{end}}
-{{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
-<form method="post" action="/login" class="stack">
-  <label class="field">
-    <span class="label">Email</span>
-    <input class="input" type="email" name="email" value="{{$d.Email}}" required autofocus autocomplete="email">
-  </label>
-  <label class="field">
-    <span class="label">Password</span>
-    <input class="input" type="password" name="password" required autocomplete="current-password">
-  </label>
-  <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+<div>
+  <h1 class="auth-brand">Cadence Cards</h1>
+  <p class="auth-sub">Sign in to your account</p>
+</div>
+{{if $d.Registered}}{{template "alert_compact" (dict "Kind" "success" "Body" "Account created. You can sign in now.")}}{{end}}
+{{if $d.Error}}{{template "alert_bare" (dict "Body" $d.Error)}}{{end}}
+<form method="post" action="/login" class="auth-form">
+  {{/* Joined into a single control: labels are sr-only, placeholders carry the
+       naming, and only the outer corners are rounded. */}}
+  <div class="input-group">
+    <label class="sr-only" for="f-email">Email address</label>
+    <input class="input input-joined" id="f-email" type="email" name="email" placeholder="Email address"
+           value="{{$d.Email}}" required autofocus autocomplete="email">
+    <label class="sr-only" for="f-password">Password</label>
+    <input class="input input-joined" id="f-password" type="password" name="password" placeholder="Password"
+           required autocomplete="current-password">
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">
+    <span class="btn-label">Sign in</span>
+    <span class="btn-busy">Signing in…</span>
+  </button>
 </form>
 <p class="auth-alt">Don't have an account? <a href="/register">Register</a></p>
 {{end}}

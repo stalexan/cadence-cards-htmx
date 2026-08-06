@@ -3,47 +3,58 @@
 {{$d := .Data}}
 {{$deck := $d.Deck}}
 {{$v := $d.Params}}
-<div class="page-header">
-  <a class="back-link" href="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}">{{template "icon-arrow-left"}} {{if $deck}}{{$deck.Name}}{{else}}Decks{{end}}</a>
+<div class="back-link-row">
+  <a class="back-link" href="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}">{{template "icon-arrow-left"}}{{if $deck}}{{$deck.Name}}{{else}}Decks{{end}}</a>
 </div>
-<div class="card form-card">
-  <h1>{{if $deck}}Edit deck{{else}}New deck{{end}}</h1>
-  {{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
-  <form method="post" action="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}" class="stack">
-    <label class="field">
-      <span class="label">Name *</span>
-      <input class="input" type="text" name="name" required
-             value="{{if $v.Name}}{{$v.Name}}{{else if $deck}}{{$deck.Name}}{{end}}">
-    </label>
-    {{if not $deck}}
-    <label class="field">
-      <span class="label">Topic *</span>
-      <select class="input select" name="topicId" required>
-        <option value="">Select a topic…</option>
-        {{range $d.Topics}}<option value="{{.ID}}" {{if eq .ID $v.TopicID}}selected{{end}}>{{.Name}}</option>{{end}}
-      </select>
-    </label>
-    {{end}}
-    <div class="field-row">
-      <label class="field">
-        <span class="label">Field 1 label <span class="hint">default “Front”</span></span>
-        <input class="input" type="text" name="field1Label"
+<div class="panel form-card">
+  <div class="panel-body">
+    <h1 class="h-form">{{if $deck}}Edit Deck{{else}}New Deck{{end}}</h1>
+    {{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
+    <form method="post" action="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}" class="stack">
+      <div class="field">
+        <label class="label" for="f-name">Deck Name</label>
+        <input class="input" id="f-name" type="text" name="name" required
+               value="{{if $v.Name}}{{$v.Name}}{{else if $deck}}{{$deck.Name}}{{end}}">
+      </div>
+      {{if not $deck}}
+      <div class="field">
+        <label class="label" for="f-topic">Topic</label>
+        <select class="input select" id="f-topic" name="topicId" required>
+          <option value="">Select a topic…</option>
+          {{range $d.Topics}}<option value="{{.ID}}" {{if eq .ID $v.TopicID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+        <p class="field-help">The topic this deck belongs to.</p>
+      </div>
+      {{end}}
+      {{/* Stacked, not side by side — the reference gives every field its own row. */}}
+      <div class="field">
+        <label class="label" for="f-field1">Field 1 Label</label>
+        <input class="input" id="f-field1" type="text" name="field1Label" placeholder="Front"
                value="{{if $v.Field1Label}}{{deref $v.Field1Label}}{{else if $deck}}{{deref $deck.Field1Label}}{{end}}">
-      </label>
-      <label class="field">
-        <span class="label">Field 2 label <span class="hint">default “Back”</span></span>
-        <input class="input" type="text" name="field2Label"
+        <p class="field-help">Label for the front/question side of cards. Defaults to “Front”.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="f-field2">Field 2 Label</label>
+        <input class="input" id="f-field2" type="text" name="field2Label" placeholder="Back"
                value="{{if $v.Field2Label}}{{deref $v.Field2Label}}{{else if $deck}}{{deref $deck.Field2Label}}{{end}}">
-      </label>
-    </div>
-    <label class="check-field">
-      <input type="checkbox" name="isBidirectional" {{if $deck}}{{if $deck.IsBidirectional}}checked{{end}}{{else if $v.IsBidirectional}}checked{{end}}>
-      <span>Bidirectional study <span class="hint">also study cards back→front; enabling creates reverse schedules for existing cards</span></span>
-    </label>
-    <div class="actions-row">
-      <button type="submit" class="btn btn-primary">{{if $deck}}Save changes{{else}}Create deck{{end}}</button>
-      <a class="btn btn-secondary" href="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}">Cancel</a>
-    </div>
-  </form>
+        <p class="field-help">Label for the back/answer side of cards. Defaults to “Back”.</p>
+      </div>
+      <div class="check-field">
+        <input type="checkbox" id="f-bidi" name="isBidirectional"
+               {{if $deck}}{{if $deck.IsBidirectional}}checked{{end}}{{else if $v.IsBidirectional}}checked{{end}}>
+        <div>
+          <label class="label" for="f-bidi">Bidirectional study</label>
+          <p class="field-help">Also study cards back→front. Enabling this creates reverse schedules for existing cards.</p>
+        </div>
+      </div>
+      <div class="actions-end">
+        <a class="btn btn-secondary" href="{{if $deck}}/decks/{{$deck.ID}}{{else}}/decks{{end}}">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <span class="btn-label">{{if $deck}}Save Changes{{else}}Create Deck{{end}}</span>
+          <span class="btn-busy">{{if $deck}}Saving…{{else}}Creating…{{end}}</span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 {{end}}

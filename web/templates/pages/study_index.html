@@ -1,29 +1,47 @@
 {{define "title"}}Study — Cadence Cards{{end}}
 {{define "content"}}
 {{$d := .Data}}
-<div class="page-header">
-  <h1>Study</h1>
+<div class="back-link-row">
+  <a class="back-link" href="/dashboard">{{template "icon-arrow-left"}}Back to Dashboard</a>
 </div>
-{{if $d.Topics}}
-<p class="muted">Pick a topic to study.</p>
-<div class="card-grid">
-  {{range $d.Topics}}
-  {{$due := index $d.DueCounts .ID}}
-  <a class="card entity-card topic-pick" href="/study/{{.ID}}/setup">
-    <span class="entity-title">{{.Name}}</span>
-    <p class="muted">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</p>
-    {{if gt $due 0}}
-    <span class="due-pill">{{$due}} due</span>
+<h1 class="page-title">Study with Claude</h1>
+
+<div class="panel">
+  <div class="panel-body">
+    <div class="picker-hero">
+      {{template "icon-book-open"}}
+      <h2>Select a Topic to Study</h2>
+      <p>Choose a topic to start a study session with smart flashcards and AI assistance.</p>
+    </div>
+    {{if $d.Topics}}
+    <div class="tile-grid">
+      {{range $d.Topics}}
+      {{$due := index $d.DueCounts .ID}}
+      <a class="tile-pick" href="/study/{{.ID}}/setup">
+        <h3 class="tile-title">{{.Name}}</h3>
+        <p class="tile-meta">{{.CardCount}} card{{if ne .CardCount 1}}s{{end}} in {{.DeckCount}} deck{{if ne .DeckCount 1}}s{{end}}</p>
+        <div class="tile-due">
+          <div class="tile-due-row"><span>Due cards:</span><strong>{{$due.Total}}</strong></div>
+          {{if gt $due.Total 0}}
+          <div class="tile-chips">
+            {{if gt $due.A 0}}<span class="due-chip due-chip-a">A: {{$due.A}}</span>{{end}}
+            {{if gt $due.B 0}}<span class="due-chip due-chip-b">B: {{$due.B}}</span>{{end}}
+            {{if gt $due.C 0}}<span class="due-chip due-chip-c">C: {{$due.C}}</span>{{end}}
+          </div>
+          {{end}}
+        </div>
+        <div class="tile-cta">Start studying →</div>
+      </a>
+      {{end}}
+    </div>
     {{else}}
-    <span class="muted">Nothing due</span>
+    <div class="empty-state">
+      {{template "icon-book-open"}}
+      <h3>No topics available</h3>
+      <p>Please create a topic first to start studying.</p>
+      <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
+    </div>
     {{end}}
-  </a>
-  {{end}}
+  </div>
 </div>
-{{else}}
-<div class="empty card">
-  <p>No topics yet — create one and add some cards to start studying.</p>
-  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
-</div>
-{{end}}
 {{end}}

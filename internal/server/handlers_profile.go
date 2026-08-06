@@ -55,12 +55,17 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r)
 	current := r.FormValue("currentPassword")
 	next := r.FormValue("newPassword")
+	confirm := r.FormValue("confirmPassword")
 
 	fail := func(msg string) {
 		s.render(w, r, http.StatusBadRequest, "profile", profileData{PasswordError: msg})
 	}
 	if len(next) < 8 {
 		fail("New password must be at least 8 characters.")
+		return
+	}
+	if next != confirm {
+		fail("New passwords do not match.")
 		return
 	}
 	hash, err := s.store.GetPasswordHash(r.Context(), user.ID)

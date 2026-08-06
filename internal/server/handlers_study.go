@@ -86,7 +86,7 @@ func (p studyParams) SessionURL() string {
 // studyIndexData feeds study_index.html.
 type studyIndexData struct {
 	Topics    []store.Topic
-	DueCounts map[int64]int
+	DueCounts map[int64]store.DueByPriority
 }
 
 func (s *Server) handleStudyIndex(w http.ResponseWriter, r *http.Request) {

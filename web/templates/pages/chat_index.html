@@ -1,22 +1,35 @@
 {{define "title"}}Chat — Cadence Cards{{end}}
 {{define "content"}}
-<div class="page-header">
-  <h1>Chat</h1>
+<div class="back-link-row">
+  <a class="back-link" href="/dashboard">{{template "icon-arrow-left"}}Back to Dashboard</a>
 </div>
-{{if .Data}}
-<p class="muted">Pick a topic to chat with Claude about.</p>
-<div class="card-grid">
-  {{range .Data}}
-  <a class="card entity-card topic-pick" href="/chat/{{.ID}}">
-    <span class="entity-title">{{.Name}}</span>
-    {{with .TopicDescription}}<p class="muted truncate-2">{{.}}</p>{{end}}
-  </a>
-  {{end}}
+<h1 class="page-title">Chat with Claude</h1>
+
+<div class="panel">
+  <div class="panel-body">
+    <div class="picker-hero">
+      {{template "icon-chat"}}
+      <h2>Select a Topic to Discuss</h2>
+      <p>Choose a topic to start a conversation with Claude about what you are learning.</p>
+    </div>
+    {{if .Data}}
+    <div class="tile-grid">
+      {{range .Data}}
+      <a class="tile-pick" href="/chat/{{.ID}}">
+        <h3 class="tile-title">{{.Name}}</h3>
+        {{with .TopicDescription}}<p class="tile-meta truncate-2">{{.}}</p>{{end}}
+        <div class="tile-cta">Start chatting →</div>
+      </a>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+      {{template "icon-chat"}}
+      <h3>No topics available</h3>
+      <p>Please create a topic first to start chatting.</p>
+      <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
+    </div>
+    {{end}}
+  </div>
 </div>
-{{else}}
-<div class="empty card">
-  <p>No topics yet — create one to start chatting.</p>
-  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} Create a topic</a>
-</div>
-{{end}}
 {{end}}

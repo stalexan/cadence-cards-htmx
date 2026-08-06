@@ -2,15 +2,12 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$p := $d.Params}}
-<div class="page-header">
-  <a class="back-link" href="/study/{{$d.Topic.ID}}/setup">{{template "icon-arrow-left"}} {{$d.Topic.Name}}</a>
-  <div id="study-progress" class="progress">
-    <div class="progress-track"><div class="progress-fill" data-progress="{{progressPercent $p.Completed $p.Total}}"></div></div>
-    <span class="progress-label">{{$p.Completed}} / {{$p.Total}}</span>
-  </div>
+<div class="session-head">
+  <a class="back-link" href="/study/{{$d.Topic.ID}}/setup">{{template "icon-arrow-left"}}{{$d.Topic.Name}}</a>
+  {{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total) "Tone" (progressTone $p.Completed $p.Total))}}
 </div>
 
 <div id="study-area" hx-get="{{$p.NextURL $p.Completed}}" hx-trigger="load">
-  <div class="card study-loading"><span class="spinner"></span> Loading next card…</div>
+  <div class="panel"><div class="panel-body study-loading"><span class="spinner"></span> Loading next card…</div></div>
 </div>
 {{end}}

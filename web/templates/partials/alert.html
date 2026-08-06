@@ -1,0 +1,37 @@
+{{/* Alerts. The reference repeats three distinct shapes, so they are three
+     defines rather than one with modifiers:
+
+       alert          icon + optional bold title + body, page-level feedback
+       alert_compact  single line with a small icon, used for profile flashes
+       alert_bare     bordered, icon-less, used on login/register
+
+     Call with (dict "Kind" "error"|"success"|"warning" "Title" "..." "Body" "...").
+     Kind picks the icon inline — Go templates can't take a dynamic
+     {{template}} name, so the branch is written out. */}}
+
+{{define "alert_icon"}}
+  {{- if eq . "success"}}{{template "icon-check-circle"}}
+  {{- else if eq . "warning"}}{{template "icon-alert-circle"}}
+  {{- else}}{{template "icon-x-circle"}}{{end -}}
+{{end}}
+
+{{define "alert"}}
+<div class="alert alert-{{.Kind}}">
+  {{template "alert_icon" .Kind}}
+  <div class="alert-body">
+    {{if .Title}}<h3 class="alert-title">{{.Title}}</h3>{{end}}
+    <div class="alert-text">{{.Body}}</div>
+  </div>
+</div>
+{{end}}
+
+{{define "alert_compact"}}
+<div class="alert alert-compact alert-{{.Kind}}">
+  {{template "alert_icon" .Kind}}
+  <span class="alert-text">{{.Body}}</span>
+</div>
+{{end}}
+
+{{define "alert_bare"}}
+<div class="alert-bare">{{.Body}}</div>
+{{end}}

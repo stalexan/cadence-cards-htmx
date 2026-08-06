@@ -3,8 +3,15 @@
 
 {{define "study_progress"}}
 <div id="study-progress" class="progress" hx-swap-oob="true">
-  <div class="progress-track"><div class="progress-fill" data-progress="{{.Percent}}"></div></div>
-  <span class="progress-label">{{.Done}} / {{.Total}}</span>
+  <div class="progress-head">
+    <span class="progress-label">Progress</span>
+    <span class="progress-label">{{.Done}} of {{.Total}} cards</span>
+  </div>
+  <div class="progress-track">
+    {{/* Width is applied by app.js from data-progress — the CSP forbids an
+         inline style attribute. The colour band comes from the server. */}}
+    <div class="progress-fill progress-{{.Tone}}" data-progress="{{.Percent}}"></div>
+  </div>
 </div>
 {{end}}
 
@@ -22,56 +29,74 @@
 {{define "study_card"}}
 {{$item := .Item}}
 {{$p := .Params}}
-{{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total))}}
+{{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total) "Tone" (progressTone $p.Completed $p.Total))}}
 
-<article class="card study-card">
-  <header class="study-card-header">
-    <div>
-      <span class="muted">{{$item.DeckName}}</span>
-      {{if $item.IsReversed}}<span class="tag">Reverse</span>{{end}}
+{{/* Two columns like the reference: card info + grading on the left, the
+     Claude conversation on the right. */}}
+<div class="study-grid">
+  <div class="panel study-info">
+    <div class="panel-body">
+      <h2 class="h-tight">Card Information</h2>
+      <dl class="info-rows">
+        <div><dt>Deck</dt><dd>{{$item.DeckName}}</dd></div>
+        <div><dt>Priority</dt><dd>{{template "priority_badge" $item.Priority}}</dd></div>
+        {{if $item.IsReversed}}<div><dt>Direction</dt><dd><span class="reverse-tag">Reversed</span></dd></div>{{end}}
+      </dl>
+
+      {{/* Per the parity decision the prompt lives inside the answer panel, as
+           in the reference — it is not shown above the chat. */}}
+      <div class="answer-section">
+        <button type="button" class="btn btn-secondary btn-block" data-toggle="#answer-panel"
+                data-label-show="Show Answer" data-label-hide="Hide Answer">{{template "icon-eye"}} Show Answer</button>
+        <div id="answer-panel" hidden>
+          <div class="answer-panel">
+            <h3>{{$item.PromptLabel}}</h3>
+            <p>{{$item.Prompt}}</p>
+            <div class="answer-sep">
+              <h3>{{$item.AnswerLabel}}</h3>
+              <p>{{$item.Answer}}</p>
+            </div>
+            {{with $item.Note}}
+            <div class="answer-sep">
+              <h3>Note</h3>
+              <p>{{.}}</p>
+            </div>
+            {{end}}
+          </div>
+        </div>
+      </div>
+
+      {{template "grade_area" (dict "ScheduleID" $item.ScheduleID "Version" $item.Version "Params" $p "Graded" false "Grade" "" "NewInterval" 0)}}
     </div>
-    {{template "priority_badge" $item.Priority}}
-  </header>
-
-  <div class="study-prompt">
-    <span class="field-label">{{$item.PromptLabel}}</span>
-    <p class="prompt-text">{{$item.Prompt}}</p>
   </div>
 
-  <div id="chat-messages" class="chat-messages study-chat">
-    {{/* Pending stub: fires on load, server generates the question and the
-         response replaces this element (outerHTML). */}}
-    <div class="chat-msg chat-assistant chat-pending"
-         hx-post="/study/{{$p.TopicID}}/question"
-         hx-vals='{"scheduleId": {{$item.ScheduleID}}}'
-         hx-trigger="load" hx-swap="outerHTML">
-      <div class="chat-bubble"><span class="typing-dots"><i></i><i></i><i></i></span> Claude is preparing a question…</div>
-    </div>
-  </div>
-
-  <form class="chat-form" hx-post="/study/{{$p.TopicID}}/chat"
-        hx-target="#chat-messages" hx-swap="beforeend"
-        hx-disabled-elt="find button" hx-indicator="#chat-spinner"
-        data-chat-form>
-    <input type="hidden" name="scheduleId" value="{{$item.ScheduleID}}">
-    <input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}">
-    <textarea class="input chat-input" name="message" rows="1" placeholder="Type your answer…" data-autoresize required></textarea>
-    <button type="submit" class="btn btn-primary">Send</button>
-    <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
-  </form>
-
-  <section class="answer-section">
-    <button type="button" class="btn btn-secondary" data-toggle="#answer-panel"
-            data-label-show="Show Answer" data-label-hide="Hide Answer">Show Answer</button>
-    <div id="answer-panel" hidden>
-      <div class="study-answer">
-        <span class="field-label">{{$item.AnswerLabel}}</span>
-        <p class="prompt-text">{{$item.Answer}}</p>
-        {{with $item.Note}}<div class="study-note"><span class="field-label">Note</span><p>{{.}}</p></div>{{end}}
+  <div class="study-chat-col">
+    <div class="chat-panel chat-tall">
+      <div class="chat-scroll">
+        <div id="chat-messages" class="chat-inner">
+          {{/* Pending stub: fires on load, server generates the question and the
+               response replaces this element (outerHTML). */}}
+          <div class="chat-msg chat-assistant chat-pending"
+               hx-post="/study/{{$p.TopicID}}/question"
+               hx-vals='{"scheduleId": {{$item.ScheduleID}}}'
+               hx-trigger="load" hx-swap="outerHTML">
+            <div class="chat-bubble"><span class="typing-dots"><i></i><i></i><i></i></span> Claude is preparing a question…</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-composer">
+        <form class="chat-form" hx-post="/study/{{$p.TopicID}}/chat"
+              hx-target="#chat-messages" hx-swap="beforeend"
+              hx-disabled-elt="find button" hx-indicator="#chat-spinner"
+              data-chat-form>
+          <input type="hidden" name="scheduleId" value="{{$item.ScheduleID}}">
+          <input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}">
+          <textarea class="chat-input" name="message" rows="1" placeholder="Type your answer…" data-autoresize required></textarea>
+          <button type="submit" class="chat-send" aria-label="Send">{{template "icon-send"}}</button>
+          <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+        </form>
       </div>
     </div>
-  </section>
-
-  {{template "grade_area" (dict "ScheduleID" $item.ScheduleID "Version" $item.Version "Params" $p "Graded" false "Grade" "" "NewInterval" 0)}}
-</article>
+  </div>
+</div>
 {{end}}

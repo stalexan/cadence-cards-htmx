@@ -84,7 +84,10 @@ func (a *testApp) do(method, path string, form url.Values) *httptest.ResponseRec
 // login registers and signs in a user, capturing the session cookie.
 func (a *testApp) login(email string) {
 	a.t.Helper()
-	w := a.do("POST", "/register", url.Values{"name": {"Test"}, "email": {email}, "password": {"password123"}})
+	w := a.do("POST", "/register", url.Values{
+		"name": {"Test"}, "email": {email},
+		"password": {"password123"}, "confirmPassword": {"password123"},
+	})
 	if w.Code != http.StatusSeeOther {
 		a.t.Fatalf("register status = %d, body: %s", w.Code, w.Body.String())
 	}
@@ -154,6 +157,21 @@ func TestAuthLifecycle(t *testing.T) {
 	}
 	if w := app.do("GET", "/dashboard", nil); w.Code != http.StatusSeeOther {
 		t.Errorf("dashboard after logout = %d, want redirect", w.Code)
+	}
+}
+
+func TestRegisterRejectsMismatchedConfirmation(t *testing.T) {
+	app := newTestApp(t, nil)
+	w := app.do("POST", "/register", url.Values{
+		"name": {"Test"}, "email": {"t@example.com"},
+		"password": {"password123"}, "confirmPassword": {"password124"},
+	})
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "Passwords do not match") {
+		t.Fatalf("mismatched confirmation = %d, body %q", w.Code, w.Body.String())
+	}
+	// The account must not have been created.
+	if _, _, err := app.store.GetUserByEmail(context.Background(), "t@example.com"); err == nil {
+		t.Error("user was created despite the mismatch")
 	}
 }
 
@@ -238,8 +256,10 @@ func TestStudyLoop(t *testing.T) {
 		"topicId": {"1"}, "grade": {"CORRECT_PERFECT_RECALL"}, "version": {"0"},
 		"deckIds": {"1"}, "total": {"1"}, "completed": {"0"},
 	})
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "selected") {
-		t.Fatalf("grade = %d", w.Code)
+	// grade-on-green marks the chosen button; it replaced the old "selected"
+	// class when the grading buttons became a solid-fill vertical stack.
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "grade-on-green") {
+		t.Fatalf("grade = %d, body %q", w.Code, w.Body.String())
 	}
 	got, err := app.store.GetSchedule(context.Background(), 1, sched.ID)
 	if err != nil || got.Version != 1 || got.RepCount != 1 {
@@ -260,7 +280,7 @@ func TestStudyLoop(t *testing.T) {
 
 	// Everything reviewed today -> next returns session complete.
 	w = app.do("GET", "/study/1/next?deckIds=1&total=1&completed=1", nil)
-	if !strings.Contains(w.Body.String(), "Session complete") {
+	if !strings.Contains(w.Body.String(), "Study Session Complete!") {
 		t.Errorf("expected session complete, got: %s", w.Body.String())
 	}
 
@@ -269,7 +289,7 @@ func TestStudyLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	w = app.do("GET", "/study/1/next?deckIds=1&limit=2&total=2&completed=2", nil)
-	if !strings.Contains(w.Body.String(), "Session complete") {
+	if !strings.Contains(w.Body.String(), "Study Session Complete!") {
 		t.Error("limit should end the session")
 	}
 }

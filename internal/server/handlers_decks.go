@@ -32,13 +32,51 @@ type deckFormData struct {
 	Error  string
 }
 
-func (s *Server) handleDecksList(w http.ResponseWriter, r *http.Request) {
+// deckGridData feeds the deck_grid partial on /decks.
+type deckGridData struct {
+	Decks []store.Deck
+	Query string
+}
+
+// deckGrid lists the user's decks, narrowed by the ?q= search term. The
+// reference filters client-side on name and topic name; matching that
+// server-side keeps the behaviour identical without shipping any JS.
+func (s *Server) deckGrid(r *http.Request) (deckGridData, error) {
 	decks, err := s.store.ListDecks(r.Context(), userFrom(r).ID, nil)
+	if err != nil {
+		return deckGridData{}, err
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q != "" {
+		needle := strings.ToLower(q)
+		filtered := decks[:0]
+		for _, d := range decks {
+			if strings.Contains(strings.ToLower(d.Name), needle) ||
+				strings.Contains(strings.ToLower(d.TopicName), needle) {
+				filtered = append(filtered, d)
+			}
+		}
+		decks = filtered
+	}
+	return deckGridData{Decks: decks, Query: q}, nil
+}
+
+func (s *Server) handleDecksList(w http.ResponseWriter, r *http.Request) {
+	grid, err := s.deckGrid(r)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, "decks_list", decks)
+	s.render(w, r, http.StatusOK, "decks_list", grid)
+}
+
+func (s *Server) handleDecksGridFragment(w http.ResponseWriter, r *http.Request) {
+	grid, err := s.deckGrid(r)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.fragment(w, http.StatusOK, "deck_grid", grid)
 }
 
 func (s *Server) handleDeckNewPage(w http.ResponseWriter, r *http.Request) {
@@ -167,24 +205,49 @@ func (s *Server) handleDeckDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleDeckExport streams the deck as YAML (port of the export endpoint,
 // same filename sanitizer and metadata).
+// handleDeckExportPreview serves the same YAML as the export endpoint but
+// without the attachment header, so the share dialog can hx-get it into a
+// readonly textarea. The reference fetches it the same way; doing it on demand
+// avoids serialising every card twice on each deck-detail page load.
+func (s *Server) handleDeckExportPreview(w http.ResponseWriter, r *http.Request) {
+	content, _, err := s.deckExportYAML(r)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(content))
+}
+
 func (s *Server) handleDeckExport(w http.ResponseWriter, r *http.Request) {
+	content, deckName, err := s.deckExportYAML(r)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	filename := sanitizeFilename(deckName) + "_cards.yaml"
+	w.Header().Set("Content-Type", "text/yaml")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Write([]byte(content))
+}
+
+// deckExportYAML builds a deck's YAML export, honouring ?includeSm2Params.
+// Shared by the download and preview handlers.
+func (s *Server) deckExportYAML(r *http.Request) (string, string, error) {
 	id, ok := pathID(r, "id")
 	if !ok {
-		http.NotFound(w, r)
-		return
+		return "", "", store.ErrNotFound
 	}
 	user := userFrom(r)
 	includeSM2 := r.URL.Query().Get("includeSm2Params") == "true"
 
 	deck, err := s.store.GetDeck(r.Context(), user.ID, id)
 	if err != nil {
-		s.storeError(w, r, err)
-		return
+		return "", "", err
 	}
 	cards, _, err := s.store.ListCards(r.Context(), user.ID, store.CardListParams{DeckID: &id})
 	if err != nil {
-		s.serverError(w, r, err)
-		return
+		return "", "", err
 	}
 
 	exports := make([]yamlio.ExportCard, len(cards))
@@ -211,14 +274,9 @@ func (s *Server) handleDeckExport(w http.ResponseWriter, r *http.Request) {
 	}
 	content, err := yamlio.Export(exports, meta, includeSM2)
 	if err != nil {
-		s.serverError(w, r, err)
-		return
+		return "", "", err
 	}
-
-	filename := sanitizeFilename(deck.Name) + "_cards.yaml"
-	w.Header().Set("Content-Type", "text/yaml")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Write([]byte(content))
+	return content, deck.Name, nil
 }
 
 // sanitizeFilename ports `name.replace(/[^a-z0-9]/gi, '_').toLowerCase()`.

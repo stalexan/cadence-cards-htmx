@@ -2,56 +2,79 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$v := $d.Params}}
-<div class="page-header">
-  <a class="back-link" href="/cards">{{template "icon-arrow-left"}} Cards</a>
+<div class="back-link-row">
+  <a class="back-link" href="/cards">{{template "icon-arrow-left"}}Cards</a>
 </div>
-<div class="card form-card">
-  <h1>New card</h1>
-  {{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
-  <form method="post" action="/cards" class="stack">
-    <label class="field">
-      <span class="label">Deck *</span>
-      <select class="input select" name="deckId" required>
-        <option value="">Select a deck…</option>
-        {{range $topic := $d.Topics}}
-        <optgroup label="{{$topic.Name}}">
-          {{range $d.Decks}}{{if eq .TopicID $topic.ID}}
-          <option value="{{.ID}}" {{if eq .ID $v.DeckID}}selected{{end}}>{{.Name}}</option>
-          {{end}}{{end}}
-        </optgroup>
-        {{end}}
-      </select>
-    </label>
-    <label class="field">
-      <span class="label">Front *</span>
-      <textarea class="input" name="front" rows="2" data-autoresize required>{{$v.Front}}</textarea>
-    </label>
-    <label class="field">
-      <span class="label">Back *</span>
-      <textarea class="input" name="back" rows="2" data-autoresize required>{{$v.Back}}</textarea>
-    </label>
-    <label class="field">
-      <span class="label">Note</span>
-      <textarea class="input" name="note" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
-    </label>
-    <div class="field">
-      <span class="label">Priority *</span>
-      <div class="radio-row">
-        <label class="radio-pill"><input type="radio" name="priority" value="A" {{if eq $v.Priority "A"}}checked{{end}}><span class="badge badge-a">A</span> High</label>
-        <label class="radio-pill"><input type="radio" name="priority" value="B" {{if eq $v.Priority "B"}}checked{{end}}><span class="badge badge-b">B</span> Medium</label>
-        <label class="radio-pill"><input type="radio" name="priority" value="C" {{if eq $v.Priority "C"}}checked{{end}}><span class="badge badge-c">C</span> Low</label>
+<div class="panel form-card">
+  <div class="panel-body">
+    <h1 class="h-form">New Card</h1>
+    {{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
+    <form method="post" action="/cards" class="stack">
+      {{/* Topic then Deck, as in the reference. Choosing a topic hx-gets the
+           matching deck options — the reference does the same narrowing
+           client-side. */}}
+      <div class="field">
+        <label class="label" for="f-topic">Topic</label>
+        <select class="input select" id="f-topic" name="topicId"
+                hx-get="/cards/deck-options" hx-target="#f-deck" hx-swap="innerHTML"
+                hx-trigger="change">
+          <option value="">Select a topic…</option>
+          {{range $d.Topics}}<option value="{{.ID}}" {{if eq .ID $d.SelectedTopicID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
       </div>
-    </div>
-    <div class="field" data-tag-input>
-      <span class="label">Tags <span class="hint">press Enter or comma to add</span></span>
-      <div class="tag-chips"></div>
-      <input class="input" type="text" data-tag-entry placeholder="Add a tag…">
-      <input type="hidden" name="tags" value="{{joinTags $v.Tags}}">
-    </div>
-    <div class="actions-row">
-      <button type="submit" class="btn btn-primary">Create card</button>
-      <a class="btn btn-secondary" href="/cards">Cancel</a>
-    </div>
-  </form>
+      <div class="field">
+        <label class="label" for="f-deck">Deck</label>
+        <select class="input select" id="f-deck" name="deckId" required>
+          {{template "deck_options" (dict "Decks" $d.DecksForSelectedTopic "Selected" (printf "%d" $v.DeckID))}}
+        </select>
+      </div>
+
+      <div class="field-grid">
+        <div class="field">
+          <label class="label" for="f-front">Front</label>
+          <textarea class="input" id="f-front" name="front" rows="4" required>{{$v.Front}}</textarea>
+        </div>
+        <div class="field">
+          <label class="label" for="f-back">Back</label>
+          <textarea class="input" id="f-back" name="back" rows="4" required>{{$v.Back}}</textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="f-note">Note</label>
+        <textarea class="input" id="f-note" name="note" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
+        <p class="field-help">Optional extra context shown when the answer is revealed.</p>
+      </div>
+
+      {{/* Bare radios in a real fieldset, as in the reference — accent-color
+           gives them the indigo Tailwind's form styling provides there. */}}
+      <fieldset class="field">
+        <legend class="label">Priority</legend>
+        <div class="radio-row">
+          <label class="radio-item"><input type="radio" name="priority" value="A" {{if eq $v.Priority "A"}}checked{{end}}><span class="check-label">A (High)</span></label>
+          <label class="radio-item"><input type="radio" name="priority" value="B" {{if eq $v.Priority "B"}}checked{{end}}><span class="check-label">B (Medium)</span></label>
+          <label class="radio-item"><input type="radio" name="priority" value="C" {{if eq $v.Priority "C"}}checked{{end}}><span class="check-label">C (Low)</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field" data-tag-input>
+        <span class="label">Tags (Optional)</span>
+        <div class="tag-entry-row">
+          <div class="tag-chips"></div>
+          <input class="input tag-entry" type="text" data-tag-entry placeholder="Add a tag…">
+        </div>
+        <p class="field-help">Press Enter or comma to add a tag.</p>
+        <input type="hidden" name="tags" value="{{joinTags $v.Tags}}">
+      </div>
+
+      <div class="actions-end">
+        <a class="btn btn-secondary" href="/cards">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <span class="btn-label">Create Card</span>
+          <span class="btn-busy">Creating…</span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 {{end}}

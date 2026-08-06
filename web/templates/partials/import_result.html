@@ -1,13 +1,25 @@
-{{/* Import outcome, swapped into #import-result. Context: importResultData. */}}
+{{/* Import outcome, swapped into #import-result. Context: importResultData.
+     Uses the shared alert shape rather than a bespoke one — this is the
+     icon + title + body variant, with the per-card errors listed underneath. */}}
 {{define "import_result"}}
 <div class="import-result">
   {{if .Success}}
   <div class="alert alert-success">
-    <strong>{{.Message}}</strong>
-    <p>Imported {{.ImportedCount}} card{{if ne .ImportedCount 1}}s{{end}} into “{{.DeckName}}”.{{if gt .FailedCount 0}} {{.FailedCount}} card{{if ne .FailedCount 1}}s{{end}} failed.{{end}}</p>
+    {{template "icon-check-circle"}}
+    <div class="alert-body">
+      <h3 class="alert-title">{{.Message}}</h3>
+      <div class="alert-text">
+        Imported {{.ImportedCount}} card{{if ne .ImportedCount 1}}s{{end}} into “{{.DeckName}}”.{{if gt .FailedCount 0}} {{.FailedCount}} card{{if ne .FailedCount 1}}s{{end}} failed.{{end}}
+      </div>
+    </div>
   </div>
   {{else}}
-  <div class="alert alert-error"><strong>{{.Message}}</strong></div>
+  <div class="alert alert-error">
+    {{template "icon-x-circle"}}
+    <div class="alert-body">
+      <h3 class="alert-title">{{.Message}}</h3>
+    </div>
+  </div>
   {{end}}
   {{if .Errors}}
   <ul class="import-errors">

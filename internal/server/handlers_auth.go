@@ -139,6 +139,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	name := formStr(r, "name")
 	email := formStr(r, "email")
 	password := r.FormValue("password")
+	confirm := r.FormValue("confirmPassword")
 
 	fail := func(msg string) {
 		s.render(w, r, http.StatusBadRequest, "register", registerData{Error: msg, Name: name, Email: email})
@@ -153,6 +154,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(password) < 8 {
 		fail("Password must be at least 8 characters.")
+		return
+	}
+	if password != confirm {
+		fail("Passwords do not match.")
 		return
 	}
 

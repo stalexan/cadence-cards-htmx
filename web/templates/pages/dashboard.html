@@ -1,60 +1,139 @@
 {{define "title"}}Dashboard — Cadence Cards{{end}}
 {{define "content"}}
 {{$d := .Data}}
-<div class="page-header">
-  <h1>Dashboard</h1>
-  <a class="btn btn-primary" href="/study">{{template "icon-play"}} Study now</a>
-</div>
+<div class="stack-6">
+  <h1>Welcome back{{with .User}}{{if .Name}}, {{.Name}}{{end}}{{end}}</h1>
 
-<div class="stat-grid">
-  <div class="card stat"><span class="stat-value">{{$d.TotalTopics}}</span><span class="stat-label">Topics</span></div>
-  <div class="card stat"><span class="stat-value">{{$d.TotalDecks}}</span><span class="stat-label">Decks</span></div>
-  <div class="card stat"><span class="stat-value">{{$d.TotalCards}}</span><span class="stat-label">Cards</span></div>
-  <div class="card stat">
-    <span class="stat-value">{{if gt (add $d.CardsCorrect $d.CardsIncorrect) 0}}{{percent $d.CardsCorrect (add $d.CardsCorrect $d.CardsIncorrect)}}%{{else}}—{{end}}</span>
-    <span class="stat-label">Correct</span>
+  {{/* Four stat cards. Each is chip + dl + tinted footer link, in its own hue.
+       Written out rather than looped: Go templates can't take a computed
+       {{template}} name, so the icon per card has to be literal. */}}
+  <div class="grid-stats">
+    <div class="panel">
+      <div class="panel-body-5">
+        <div class="media-row">
+          <div class="chip chip-indigo">{{template "icon-folder"}}</div>
+          <div class="media-body">
+            <dl>
+              <dt class="stat-label">Total Topics</dt>
+              <dd class="stat-value">{{$d.TotalTopics}}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <a class="footer-link" href="/topics">View all topics{{template "icon-arrow-right"}}</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-body-5">
+        <div class="media-row">
+          <div class="chip chip-blue">{{template "icon-book-open"}}</div>
+          <div class="media-body">
+            <dl>
+              <dt class="stat-label">Total Decks</dt>
+              <dd class="stat-value">{{$d.TotalDecks}}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <a class="footer-link" href="/decks">View all decks{{template "icon-arrow-right"}}</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-body-5">
+        <div class="media-row">
+          <div class="chip chip-green">{{template "icon-file-text"}}</div>
+          <div class="media-body">
+            <dl>
+              <dt class="stat-label">Total Cards</dt>
+              <dd class="stat-value">{{$d.TotalCards}}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <a class="footer-link" href="/cards">View all cards{{template "icon-arrow-right"}}</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-body-5">
+        <div class="media-row">
+          <div class="chip chip-purple">{{template "icon-bar-chart"}}</div>
+          <div class="media-body">
+            <dl>
+              <dt class="stat-label">Correct Rate</dt>
+              <dd class="stat-value">{{if gt (add $d.CardsCorrect $d.CardsIncorrect) 0}}{{percent $d.CardsCorrect (add $d.CardsCorrect $d.CardsIncorrect)}}%{{else}}—{{end}}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <a class="footer-link" href="/study">Study now{{template "icon-arrow-right"}}</a>
+      </div>
+    </div>
   </div>
-</div>
 
-<div class="dash-columns">
-  <div class="card">
-    <h2 class="card-title">Due for review</h2>
-    <ul class="due-list">
-      <li><span class="badge badge-a">A</span> High priority <strong>{{$d.DueA}}</strong></li>
-      <li><span class="badge badge-b">B</span> Medium priority <strong>{{$d.DueB}}</strong></li>
-      <li><span class="badge badge-c">C</span> Low priority <strong>{{$d.DueC}}</strong></li>
-    </ul>
-    {{if gt (add (add $d.DueA $d.DueB) $d.DueC) 0}}
-    <a class="btn btn-primary" href="/study">Start studying</a>
-    {{else}}
-    <p class="muted">Nothing due right now. 🎉</p>
-    {{end}}
+  <div class="panel">
+    <div class="panel-body">
+      <h2 class="h-tight">Cards Due Today</h2>
+      <div class="due-grid">
+        <div class="due-tile due-a">
+          <dt>Priority A</dt>
+          <dd>{{$d.DueA}}</dd>
+        </div>
+        <div class="due-tile due-b">
+          <dt>Priority B</dt>
+          <dd>{{$d.DueB}}</dd>
+        </div>
+        <div class="due-tile due-c">
+          <dt>Priority C</dt>
+          <dd>{{$d.DueC}}</dd>
+        </div>
+      </div>
+    </div>
+    <div class="panel-footer-wide">
+      <a class="footer-link-strong" href="/study">Start study session <span aria-hidden="true">→</span></a>
+    </div>
   </div>
 
-  <div class="card">
-    <h2 class="card-title">Recent activity</h2>
-    {{if $d.RecentActivity}}
-    <ul class="activity-list">
-      {{range $d.RecentActivity}}
-      <li>
-        <a class="table-link" href="/cards/{{.CardID}}">{{.ItemName}}</a>
-        <span class="muted">{{.Action}} · {{.DeckName}} · {{formatDateTime .Timestamp}}</span>
-      </li>
+  <div class="panel">
+    <div class="panel-body">
+      <h2 class="h-tight">Quick Actions</h2>
+      <div class="qa-grid">
+        <a class="btn btn-primary" href="/topics/new">Create Topic</a>
+        <a class="btn btn-blue" href="/decks/new">Create Deck</a>
+        <a class="btn btn-green" href="/cards/new">Add Card</a>
+        <a class="btn btn-purple" href="/import">Import Cards</a>
+      </div>
+    </div>
+  </div>
+
+  {{/* No counterpart in the reference — kept, styled to the panel convention. */}}
+  <div class="panel">
+    <div class="panel-body">
+      <h2 class="h-tight">Recent Activity</h2>
+      {{if $d.RecentActivity}}
+      <ul class="divide-list">
+        {{range $d.RecentActivity}}
+        <li>
+          <a class="activity-name" href="/cards/{{.CardID}}">{{.ItemName}}</a>
+          <div class="activity-meta">{{.Action}} · {{.DeckName}} · {{formatDateTime .Timestamp}}</div>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="activity-meta">No reviews yet.</p>
       {{end}}
-    </ul>
-    {{else}}
-    <p class="muted">No reviews yet.</p>
+    </div>
+    {{if $d.RecentActivity}}
+    <div class="panel-footer-wide">
+      <a class="footer-link-strong" href="/cards">View all cards <span aria-hidden="true">→</span></a>
+    </div>
     {{end}}
-  </div>
-</div>
-
-<div class="card quick-actions">
-  <h2 class="card-title">Quick actions</h2>
-  <div class="actions-row">
-    <a class="btn btn-secondary" href="/topics/new">{{template "icon-plus"}} New topic</a>
-    <a class="btn btn-secondary" href="/decks/new">{{template "icon-plus"}} New deck</a>
-    <a class="btn btn-secondary" href="/cards/new">{{template "icon-plus"}} New card</a>
-    <a class="btn btn-secondary" href="/import">{{template "icon-upload"}} Import cards</a>
   </div>
 </div>
 {{end}}

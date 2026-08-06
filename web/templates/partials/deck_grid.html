@@ -1,0 +1,55 @@
+{{/* Deck grid for /decks, swapped by the search box. Context: deckGridData.
+     The reference filters client-side; here the same box hx-gets this
+     fragment, which keeps the filtering server-side and the CSP clean. */}}
+{{define "deck_grid"}}
+<div id="deck-grid">
+  <div class="list-search">
+    <input class="input" type="search" name="q" placeholder="Search decks…" value="{{.Query}}"
+           aria-label="Search decks"
+           hx-get="/decks/grid" hx-target="#deck-grid" hx-swap="outerHTML"
+           hx-push-url="/decks{{if .Query}}?q={{.Query}}{{end}}"
+           hx-trigger="input changed delay:300ms">
+  </div>
+  {{if .Decks}}
+  <div class="grid-cards">
+    {{range .Decks}}
+    <div class="panel">
+      <div class="panel-body-5">
+        <div class="media-row">
+          <div class="chip chip-blue">{{template "icon-book-open"}}</div>
+          <div class="media-body">
+            <a href="/decks/{{.ID}}"><h3 class="entity-title">{{.Name}}</h3></a>
+            <div class="entity-meta-stacked">
+              <a class="entity-link" href="/topics/{{.TopicID}}">{{.TopicName}}</a>
+              <span>{{.CardCount}} card{{if ne .CardCount 1}}s{{end}}{{if .IsBidirectional}} · bidirectional{{end}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-footer footer-split">
+        <a class="entity-link" href="/decks/{{.ID}}">View details</a>
+        <div class="footer-actions">
+          <a class="link-green" href="/study/{{.TopicID}}/setup">Study</a>
+          <a class="link-gray" href="/decks/{{.ID}}/edit">Edit</a>
+          <form method="post" action="/decks/{{.ID}}/delete"
+                data-confirm-title="Delete Deck?"
+                data-confirm="Delete deck “{{.Name}}” and all of its cards?">
+            <button type="submit" class="link-red">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else if .Query}}
+  <div class="no-match"><p>No decks match your search criteria</p></div>
+  {{else}}
+  <div class="empty-state">
+    {{template "icon-book-open"}}
+    <h3>No decks yet</h3>
+    <p>Get started by creating a new deck.</p>
+    <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} New Deck</a>
+  </div>
+  {{end}}
+</div>
+{{end}}

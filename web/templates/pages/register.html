@@ -1,23 +1,36 @@
 {{define "title"}}Register — Cadence Cards{{end}}
 {{define "content"}}
 {{$d := .Data}}
-<h2 class="auth-title">Create an account</h2>
-{{if $d.Error}}<div class="alert alert-error">{{$d.Error}}</div>{{end}}
-<form method="post" action="/register" class="stack">
-  <label class="field">
-    <span class="label">Name</span>
-    <input class="input" type="text" name="name" value="{{$d.Name}}" required autofocus autocomplete="name">
-  </label>
-  <label class="field">
-    <span class="label">Email</span>
-    <input class="input" type="email" name="email" value="{{$d.Email}}" required autocomplete="email">
-  </label>
-  <label class="field">
-    <span class="label">Password</span>
-    <input class="input" type="password" name="password" required minlength="8" autocomplete="new-password">
-    <span class="hint">At least 8 characters.</span>
-  </label>
-  <button type="submit" class="btn btn-primary btn-block">Create account</button>
+<div>
+  <h1 class="auth-brand">Cadence Cards</h1>
+  <p class="auth-sub">Create your account</p>
+</div>
+{{if $d.Error}}{{template "alert_bare" (dict "Body" $d.Error)}}{{end}}
+{{/* Separate labelled fields here, unlike login's joined control. */}}
+<form method="post" action="/register" class="auth-form">
+  <div class="auth-fields">
+    <div class="field">
+      <label class="label" for="f-name">Name</label>
+      <input class="input" id="f-name" type="text" name="name" value="{{$d.Name}}" required autofocus autocomplete="name">
+    </div>
+    <div class="field">
+      <label class="label" for="f-email">Email address</label>
+      <input class="input" id="f-email" type="email" name="email" value="{{$d.Email}}" required autocomplete="email">
+    </div>
+    <div class="field">
+      <label class="label" for="f-password">Password</label>
+      <input class="input" id="f-password" type="password" name="password" required minlength="8" autocomplete="new-password">
+      <p class="field-help">At least 8 characters.</p>
+    </div>
+    <div class="field">
+      <label class="label" for="f-confirm">Confirm Password</label>
+      <input class="input" id="f-confirm" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">
+    <span class="btn-label">Create account</span>
+    <span class="btn-busy">Creating…</span>
+  </button>
 </form>
 <p class="auth-alt">Already have an account? <a href="/login">Sign in</a></p>
 {{end}}

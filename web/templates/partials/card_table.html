@@ -1,80 +1,116 @@
 {{/* Shared card table for /cards and /decks/{id}. Context: cardTableData.
      Filters/sort/pagination are server-side: every control hx-gets this
-     fragment and swaps #card-table. */}}
+     fragment and swaps #card-table.
+
+     Two panels like the reference: filters in their own panel above, then the
+     table panel whose heading carries the count and whose footer is the
+     pagination. */}}
 {{define "card_table"}}
 {{$d := .}}
 <div id="card-table">
-  <form class="filter-bar" hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML"
-        hx-push-url="{{.PushURL}}" hx-trigger="submit, change from:find select">
-    <input class="input" type="search" name="q" placeholder="Search cards…" value="{{.Query.Search}}"
-           hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}"
-           hx-trigger="input changed delay:300ms" hx-include="closest form">
-    {{if not .DeckID}}
-    <select class="input select" name="topicId" aria-label="Filter by topic">
-      <option value="">All topics</option>
-      {{range .Topics}}<option value="{{.ID}}" {{if and $d.Query.TopicID (eq (deref64 $d.Query.TopicID) .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
-    </select>
-    <select class="input select" name="deckId" aria-label="Filter by deck">
-      <option value="">All decks</option>
-      {{range .Decks}}<option value="{{.ID}}" {{if and $d.Query.DeckID (eq (deref64 $d.Query.DeckID) .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
-    </select>
-    <select class="input select" name="tag" aria-label="Filter by tag">
-      <option value="">All tags</option>
-      {{range .Tags}}<option value="{{.}}" {{if eq $d.Query.Tag .}}selected{{end}}>{{.}}</option>{{end}}
-    </select>
-    {{end}}
-    <select class="input select" name="priority" aria-label="Filter by priority">
-      <option value="">All priorities</option>
-      <option value="A" {{if eq .Query.Priority "A"}}selected{{end}}>A — High</option>
-      <option value="B" {{if eq .Query.Priority "B"}}selected{{end}}>B — Medium</option>
-      <option value="C" {{if eq .Query.Priority "C"}}selected{{end}}>C — Low</option>
-    </select>
-    <input type="hidden" name="sort" value="{{.Query.Sort}}">
-    <input type="hidden" name="dir" value="{{.Query.Dir}}">
-  </form>
+  <div class="panel filters-panel">
+    <div class="panel-body">
+      <div class="filters-head">
+        <h2 class="filters-title">{{template "icon-filter"}}Filters</h2>
+        <a class="btn btn-secondary btn-sm" href="{{.PushURL}}">{{template "icon-rotate-ccw"}}Reset</a>
+      </div>
+      <form class="filters-row" hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML"
+            hx-push-url="{{.PushURL}}" hx-trigger="submit, change from:find select">
+        <div class="filter-grow">
+          <label class="label" for="f-q">Search</label>
+          <input class="input" id="f-q" type="search" name="q" placeholder="Search cards…" value="{{.Query.Search}}"
+                 hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}"
+                 hx-trigger="input changed delay:300ms" hx-include="closest form">
+        </div>
+        {{if not .DeckID}}
+        <div class="filter-fixed">
+          <label class="label" for="f-topic">Topic</label>
+          <select class="input select" id="f-topic" name="topicId">
+            <option value="">All topics</option>
+            {{range .Topics}}<option value="{{.ID}}" {{if and $d.Query.TopicID (eq (deref64 $d.Query.TopicID) .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
+          </select>
+        </div>
+        <div class="filter-fixed">
+          <label class="label" for="f-deck">Deck</label>
+          <select class="input select" id="f-deck" name="deckId">
+            <option value="">All decks</option>
+            {{range .Decks}}<option value="{{.ID}}" {{if and $d.Query.DeckID (eq (deref64 $d.Query.DeckID) .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
+          </select>
+        </div>
+        <div class="filter-fixed">
+          <label class="label" for="f-tag">Tag</label>
+          <select class="input select" id="f-tag" name="tag">
+            <option value="">All tags</option>
+            {{range .Tags}}<option value="{{.}}" {{if eq $d.Query.Tag .}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </div>
+        {{end}}
+        <div class="filter-fixed">
+          <label class="label" for="f-priority">Priority</label>
+          <select class="input select" id="f-priority" name="priority">
+            <option value="">All priorities</option>
+            <option value="A" {{if eq .Query.Priority "A"}}selected{{end}}>A — High</option>
+            <option value="B" {{if eq .Query.Priority "B"}}selected{{end}}>B — Medium</option>
+            <option value="C" {{if eq .Query.Priority "C"}}selected{{end}}>C — Low</option>
+          </select>
+        </div>
+        <input type="hidden" name="sort" value="{{.Query.Sort}}">
+        <input type="hidden" name="dir" value="{{.Query.Dir}}">
+      </form>
+    </div>
+  </div>
 
   {{if .Cards}}
-  <div class="table-wrap card">
-    <table class="table">
-      <thead>
-        <tr>
-          <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "front"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "front"}}">Front{{if eq .Query.Sort "front"}}{{if eq .Query.Dir "desc"}} ↓{{else}} ↑{{end}}{{end}}</button></th>
-          <th class="hide-sm">Back</th>
-          {{if not .DeckID}}<th class="hide-sm"><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "deck"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "deck"}}">Deck{{if eq .Query.Sort "deck"}}{{if eq .Query.Dir "desc"}} ↓{{else}} ↑{{end}}{{end}}</button></th>{{end}}
-          <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "priority"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "priority"}}">Priority{{if eq .Query.Sort "priority"}}{{if eq .Query.Dir "desc"}} ↓{{else}} ↑{{end}}{{end}}</button></th>
-          <th class="hide-sm"><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "lastSeen"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "lastSeen"}}">Last seen{{if eq .Query.Sort "lastSeen"}}{{if eq .Query.Dir "desc"}} ↓{{else}} ↑{{end}}{{end}}</button></th>
-          <th class="hide-sm">Tags</th>
-          <th class="th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Cards}}
-        <tr>
-          <td><a class="table-link" href="/cards/{{.ID}}">{{.Front}}</a></td>
-          <td class="hide-sm truncate">{{.Back}}</td>
-          {{if not $d.DeckID}}<td class="hide-sm">{{.DeckName}}</td>{{end}}
-          <td>{{template "priority_badge" .Priority}}</td>
-          <td class="hide-sm">{{with .ForwardSchedule}}{{formatDatePtr .LastSeen}}{{else}}—{{end}}</td>
-          <td class="hide-sm">{{range .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
-          <td class="row-actions">
-            <a class="btn btn-ghost btn-icon" href="/cards/{{.ID}}" title="Edit">{{template "icon-pencil"}}</a>
-            <form method="post" action="/cards/{{.ID}}/delete" data-confirm="Delete this card? This cannot be undone.">
-              <input type="hidden" name="redirect" value="{{$d.PushURL}}{{$d.QueryString}}">
-              <button type="submit" class="btn btn-ghost btn-icon btn-danger-icon" title="Delete">{{template "icon-trash"}}</button>
-            </form>
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  <div class="table-footer">
-    <span class="muted">{{.Total}} card{{if ne .Total 1}}s{{end}}</span>
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Cards ({{len .Cards}} of {{.Total}})</h2>
+    </div>
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "front"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "front"}}">Front{{if eq .Query.Sort "front"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            <th>Back</th>
+            {{if not .DeckID}}<th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "deck"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "deck"}}">Deck{{if eq .Query.Sort "deck"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>{{end}}
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "priority"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "priority"}}">Priority{{if eq .Query.Sort "priority"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "lastSeen"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "lastSeen"}}">Last seen{{if eq .Query.Sort "lastSeen"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            <th>Tags</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Cards}}
+          <tr>
+            <td><a class="table-link" href="/cards/{{.ID}}">{{.Front}}</a></td>
+            <td class="truncate">{{.Back}}</td>
+            {{if not $d.DeckID}}<td>{{.DeckName}}</td>{{end}}
+            <td>{{template "priority_badge" .Priority}}</td>
+            <td>{{with .ForwardSchedule}}{{formatDatePtr .LastSeen}}{{else}}—{{end}}</td>
+            <td>{{range .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
+            <td class="cell-actions">
+              <div>
+                <a class="icon-action" href="/cards/{{.ID}}" title="View">{{template "icon-eye"}}</a>
+                <a class="icon-action" href="/cards/{{.ID}}" title="Edit">{{template "icon-pencil"}}</a>
+                <form method="post" action="/cards/{{.ID}}/delete"
+                      data-confirm-title="Delete Card?"
+                      data-confirm="Delete this card? This cannot be undone.">
+                  <input type="hidden" name="redirect" value="{{$d.PushURL}}{{$d.QueryString}}">
+                  <button type="submit" class="icon-action icon-action-danger" title="Delete">{{template "icon-trash"}}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
     {{template "pagination" .}}
   </div>
   {{else}}
-  <div class="empty card">
-    <p>No cards found.</p>
+  <div class="empty-state">
+    {{template "icon-file-text"}}
+    <h3>No cards found</h3>
+    <p>Try clearing the filters, or add a card to get started.</p>
     {{if .DeckID}}<a class="btn btn-primary" href="/cards/new?deckId={{deref64 .DeckID}}">{{template "icon-plus"}} Add your first card</a>
     {{else}}<a class="btn btn-primary" href="/cards/new">{{template "icon-plus"}} Add a card</a>{{end}}
   </div>

@@ -1,0 +1,18 @@
+{{/* Navigation links, shared by the desktop sidebar and the mobile drawer.
+     Called with (dict "Path" .Path "Class" "nav-link"|"drawer-link") — Go
+     templates can't take a dynamic {{template}} name, so the icon per item is
+     written out literally rather than looped over.
+
+     Mirrors the reference app's nav, plus Import: the reference has no entry
+     point for it, but this app needs one. */}}
+{{define "nav_links"}}
+{{- $c := .Class}}{{$p := .Path}}
+<a href="/dashboard" class="{{$c}}{{if eq $p "/dashboard"}} active{{end}}">{{template "icon-home"}}<span>Dashboard</span></a>
+<a href="/topics" class="{{$c}}{{if hasPrefix $p "/topics"}} active{{end}}">{{template "icon-folder"}}<span>Topics</span></a>
+<a href="/decks" class="{{$c}}{{if hasPrefix $p "/decks"}} active{{end}}">{{template "icon-book-open"}}<span>Decks</span></a>
+<a href="/cards" class="{{$c}}{{if hasPrefix $p "/cards"}} active{{end}}">{{template "icon-file-text"}}<span>Cards</span></a>
+<a href="/study" class="{{$c}}{{if hasPrefix $p "/study"}} active{{end}}">{{template "icon-book-open"}}<span>Study</span></a>
+<a href="/chat" class="{{$c}}{{if hasPrefix $p "/chat"}} active{{end}}">{{template "icon-chat"}}<span>Chat</span></a>
+<a href="/import" class="{{$c}}{{if hasPrefix $p "/import"}} active{{end}}">{{template "icon-upload"}}<span>Import</span></a>
+<a href="/profile" class="{{$c}}{{if hasPrefix $p "/profile"}} active{{end}}">{{template "icon-user"}}<span>Profile</span></a>
+{{- end}}

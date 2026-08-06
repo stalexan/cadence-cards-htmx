@@ -1,0 +1,6 @@
+{{/* Deck <option>s for the card form's deck select, swapped in when the topic
+     select changes. Context: deckOptionsData. */}}
+{{define "deck_options"}}
+<option value="">{{if .Decks}}Select a deck…{{else}}No decks in this topic{{end}}</option>
+{{range .Decks}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $.Selected}}selected{{end}}>{{.Name}}</option>{{end}}
+{{end}}

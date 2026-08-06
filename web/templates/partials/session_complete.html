@@ -1,11 +1,11 @@
 {{/* Rendered by /study/{topicId}/next when the limit is reached or nothing
      is due. Context: sessionCompleteData. */}}
 {{define "session_complete"}}
-{{template "study_progress" (dict "Done" .Completed "Total" .Completed "Percent" 100)}}
-<div class="card session-complete">
-  <div class="complete-icon">{{template "icon-check"}}</div>
-  <h2>Session complete</h2>
-  <p class="muted">You've completed {{.Completed}} card{{if ne .Completed 1}}s{{end}}.</p>
+{{template "study_progress" (dict "Done" .Completed "Total" .Completed "Percent" 100 "Tone" "high")}}
+{{/* The reference has no check icon here and stacks the CTAs vertically. */}}
+<div class="session-complete">
+  <h2 class="complete-title">Study Session Complete!</h2>
+  <p class="complete-sub">You've completed {{.Completed}} card{{if ne .Completed 1}}s{{end}}.</p>
   <div class="complete-actions">
     <a class="btn btn-primary" href="/study">Start New Session</a>
     <a class="btn btn-secondary" href="/dashboard">Return to Dashboard</a>

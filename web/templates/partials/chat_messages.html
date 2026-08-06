@@ -1,15 +1,21 @@
 {{/* Chat bubbles. chat_exchange is the POST response for both the topic chat
      and the study chat: a user bubble + an assistant bubble appended to the
-     message list, plus an OOB update of the hidden #chat-history input. */}}
+     message list, plus an OOB update of the hidden #chat-history input.
+
+     The copy button lives *inside* the assistant bubble (absolutely
+     positioned) rather than beside it, which is why the bubble carries extra
+     right padding. */}}
 
 {{define "chat_bubble_user"}}
 <div class="chat-msg chat-user"><div class="chat-bubble">{{.}}</div></div>
 {{end}}
 
 {{define "chat_bubble_assistant"}}
-<div class="chat-msg chat-assistant{{if .IsError}} chat-error{{end}}">
-  <div class="chat-bubble markdown-content">{{markdown .Text}}</div>
-  <button type="button" class="btn btn-ghost btn-icon copy-btn" data-copy="{{.Text}}" title="Copy message">{{template "icon-clipboard"}}</button>
+<div class="chat-msg chat-assistant">
+  <div class="chat-bubble markdown-content{{if .IsError}} chat-error{{end}}">
+    {{markdown .Text}}
+    <button type="button" class="copy-btn" data-copy="{{.Text}}" title="Copy message">{{template "icon-clipboard"}}</button>
+  </div>
 </div>
 {{end}}
 
