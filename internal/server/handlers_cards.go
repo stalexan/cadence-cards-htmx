@@ -98,6 +98,46 @@ func (s *Server) cardTable(r *http.Request, deckID *int64) (cardTableData, error
 	return data, nil
 }
 
+// StartItem and EndItem are the 1-based bounds of the current page, for the
+// "Showing X to Y of Z results" summary.
+func (d cardTableData) StartItem() int {
+	if d.Total == 0 {
+		return 0
+	}
+	return (d.Page-1)*cardsPerPage + 1
+}
+
+func (d cardTableData) EndItem() int {
+	return min(d.Page*cardsPerPage, d.Total)
+}
+
+// PageWindow returns the page buttons to render. A positive value is a page
+// number; 0 means an ellipsis. Direct port of visiblePages() in the reference's
+// ui/Pagination.svelte — keep the boundaries identical, they are load-bearing
+// for which pages stay visible near the ends.
+func (d cardTableData) PageWindow() []int {
+	total, cur := d.TotalPages, d.Page
+	if total <= 7 {
+		pages := make([]int, 0, total)
+		for i := 1; i <= total; i++ {
+			pages = append(pages, i)
+		}
+		return pages
+	}
+
+	pages := []int{1}
+	if cur > 3 {
+		pages = append(pages, 0)
+	}
+	for i := max(2, cur-1); i <= min(total-1, cur+1); i++ {
+		pages = append(pages, i)
+	}
+	if cur < total-2 {
+		pages = append(pages, 0)
+	}
+	return append(pages, total)
+}
+
 // QueryString rebuilds the current filter query with an overridden key
 // (pagination links, sort toggles).
 func (d cardTableData) QueryString(overrides ...string) string {
