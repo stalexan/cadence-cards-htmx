@@ -3,9 +3,14 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 )
+
+// dotEnvPath is read at startup when present. It is absent from the container
+// image (.dockerignore), so this is effectively local-development only.
+const dotEnvPath = ".env"
 
 // Config holds all runtime configuration.
 type Config struct {
@@ -24,8 +29,18 @@ type Config struct {
 	AppVersion string // APP_VERSION, informational
 }
 
-// Load reads configuration from the environment.
+// Load reads configuration from the environment, first exporting any variables
+// found in .env that are not already set (see loadDotEnv).
 func Load() (Config, error) {
+	set, skipped, err := loadDotEnv(dotEnvPath)
+	if err != nil {
+		return Config{}, err
+	}
+	if set+skipped > 0 {
+		// Counts only — this file holds the API key.
+		slog.Info("loaded .env", "path", dotEnvPath, "set", set, "skippedAlreadySet", skipped)
+	}
+
 	cfg := Config{
 		Port:                     3000,
 		DBPath:                   "/data/cadence.db",

@@ -88,7 +88,8 @@ func main() {
 		httpServer.Shutdown(ctx)
 	}()
 
-	slog.Info("cadence-cards listening", "port", cfg.Port, "db", cfg.DBPath, "version", cfg.AppVersion)
+	slog.Info("cadence-cards listening", "port", cfg.Port, "db", cfg.DBPath, "version", cfg.AppVersion,
+		"claudeConfigured", cfg.ClaudeAPIKey != "")
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal("listen", err)
 	}

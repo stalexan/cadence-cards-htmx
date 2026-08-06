@@ -43,13 +43,27 @@ DB_PATH=./dev.db COOKIE_SECURE=false ENABLE_PUBLIC_REGISTRATION=true go run ./cm
 # → http://localhost:3000
 ```
 
+The binary reads `.env` from the working directory at startup, so once you have copied
+`.env.example` and uncommented `DB_PATH`, `COOKIE_SECURE`, and `ENABLE_PUBLIC_REGISTRATION` there,
+a bare `go run ./cmd/cadence` is enough. Variables already set in the environment always win over
+the file, so the inline form above still works and remains handy for one-off overrides
+(`CLAUDE_MAX_TOKENS=99 go run ./cmd/cadence`).
+
 `CLAUDE_API_KEY` is only needed for the study-question/chat features; without it the UI degrades to
-error bubbles.
+error bubbles. The startup log line reports `claudeConfigured` so you can tell at a glance whether
+the key actually reached the process.
 
 ## Configuration
 
-All configuration is environment variables — there is no config file. `.env.example` is the
-template; copy it to `.env`, which `docker compose` reads automatically.
+All configuration is environment variables. `.env.example` is the template; copy it to `.env`, which
+both `docker compose` and the binary itself read — compose for `${VAR}` substitution, the app via
+`config.Load` at startup.
+
+Precedence is one rule: **a variable already present in the environment is never overwritten by
+`.env`.** So compose-supplied values always win in the container, and an inline
+`VAR=x go run ./cmd/cadence` always wins locally. `.env` is listed in `.dockerignore`, so the image
+never contains one and the file is effectively a local-development convenience. A missing `.env` is
+not an error; a malformed line fails startup with the file and line number.
 
 | Variable | Default | Read by | Notes |
 | --- | --- | --- | --- |
@@ -62,7 +76,7 @@ template; copy it to `.env`, which `docker compose` reads automatically.
 | `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
 | `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |
 | `APP_VERSION` | *(empty)* | app | Informational; shown in the sidebar footer. |
-| `TZ` | `UTC` | container | SM-2 due dates use local-midnight day boundaries, so this decides when a card becomes due. Set it to your users' timezone. |
+| `TZ` | `UTC` | container, app | SM-2 due dates use local-midnight day boundaries, so this decides when a card becomes due. Set it to your users' timezone. Also honoured from `.env` locally: `config.Load` runs before anything resolves `time.Local`, so a `TZ` set there still applies. |
 | `SHARED_NETWORK_NAME` | `cadence-cards-shared` | compose | External network the reverse proxy lives on. Not seen by the app. |
 
 Booleans are parsed strictly: only the literal string `true` enables them, anything else is false.
@@ -70,8 +84,14 @@ Booleans are parsed strictly: only the literal string `true` enables them, anyth
 
 The four "rarely needed" variables in `.env.example` (`PORT`, `DB_PATH`, `COOKIE_SECURE`,
 `DISABLE_RATE_LIMITING`) are not passed through by [`docker-compose.yml`](docker-compose.yml) —
-uncommenting them in `.env` has no effect on the container. Add them to the `environment:` block if
-you need them there.
+uncommenting them in `.env` affects a local `go run` but has no effect on the container. Add them to
+the `environment:` block if you need them there.
+
+`.env` parsing is deliberately minimal: `KEY=VALUE`, blank lines and `#` comment lines skipped, an
+optional `export ` prefix stripped, and the split on the first `=` only. Values may be wrapped in
+single or double quotes (escapes are interpreted inside double quotes). There is **no inline-comment
+stripping** — an unquoted value runs to end of line, so `NUM=4000 # note` yields the literal
+`4000 # note` and a startup error rather than silently truncating. Quote any value containing `#`.
 
 ## Deployment
 

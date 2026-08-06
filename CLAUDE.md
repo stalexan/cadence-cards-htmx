@@ -17,7 +17,9 @@ go vet ./...
 gofmt -l .           # must print nothing
 
 # Run locally (no Docker needed; CLAUDE_API_KEY optional — AI features
-# degrade to error bubbles without it)
+# degrade to error bubbles without it).  These inline vars are optional if
+# they are set in ./.env, which the binary reads at startup; anything already
+# in the environment takes precedence over the file.
 DB_PATH=./dev.db COOKIE_SECURE=false ENABLE_PUBLIC_REGISTRATION=true \
   go run ./cmd/cadence            # → http://localhost:3000
 
@@ -39,7 +41,10 @@ and HTMX swapping fragments.
 - `cmd/cadence/` — wiring only: config → store/migrations → server → graceful shutdown; hourly
   maintenance ticker; `-create-user` CLI.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
-  `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).
+  `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports
+  only keys **not already in the environment**, so the real environment always wins and a stray
+  `.env` can never override compose. A missing file is fine; `.env` is `.dockerignore`d, so this is
+  local-dev only.
 - `internal/sm2/` — pure SM-2 algorithm, a verbatim port of the Svelte app's `sm2.ts` **including
   its tests**. `now` is always injected as a parameter.  Due-ness uses **local-midnight day
   boundaries** (`time.Local`), so the container's `TZ` matters.
