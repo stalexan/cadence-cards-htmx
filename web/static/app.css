@@ -1132,7 +1132,12 @@ form[data-busy] .btn-busy { display: inline; }
   width: 100%; max-width: 48rem; margin: 0 auto;      /* max-w-3xl */
   border-radius: var(--radius-lg); background: #fff; box-shadow: var(--shadow);
 }
-.chat-tall { height: 37.5rem; }                        /* h-[600px] */
+/* Study page: the panel grows with the conversation and the document scrolls,
+   with the reference's 600px as a floor rather than a cap.  With no definite
+   height on the panel, flex-basis:auto sizes .chat-scroll to its content;
+   flex-grow still absorbs the slack while min-height is what's binding. */
+.chat-grow { min-height: 37.5rem; }
+.chat-grow .chat-scroll { flex: 1 1 auto; overflow-y: visible; }
 .chat-full { height: 100%; }
 /* The chat page fills the main column: header on top, panel taking the rest,
    so the composer sits at the bottom of the viewport rather than the document.

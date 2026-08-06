@@ -204,16 +204,33 @@
       if (input) { input.value = ""; autoresize(input); input.focus(); }
     }
   });
+  // The chat page's panel has a definite height, so .chat-scroll is its scroll
+  // container; the study page's panel grows the document instead, so there we
+  // bring the composer to the bottom of the viewport, which puts the newest
+  // message just above it.
+  function scrollChatToNewest() {
+    var messages = document.getElementById("chat-messages");
+    if (!messages) return;
+    var scroller = messages.closest(".chat-scroll");
+    if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+      scroller.scrollTop = scroller.scrollHeight;
+      return;
+    }
+    var panel = messages.closest(".chat-panel");
+    var composer = panel && panel.querySelector(".chat-composer");
+    if (composer) composer.scrollIntoView({ block: "end", behavior: "smooth" });
+  }
+  // Only appends into the message list scroll: the card fragment targets
+  // #study-area and the initial question replaces the pending stub, so neither
+  // yanks the page down when a card loads.
   document.addEventListener("htmx:afterSwap", function (e) {
     initAutoresize(e.target);
     initTagInputs(e.target);
-    var messages = document.getElementById("chat-messages");
-    if (messages) messages.scrollTop = messages.scrollHeight;
+    if (e.target && e.target.id === "chat-messages") scrollChatToNewest();
   });
-  // OOB swaps (question fragment, history updates) also land here.
-  document.addEventListener("htmx:oobAfterSwap", function () {
-    var messages = document.getElementById("chat-messages");
-    if (messages) messages.scrollTop = messages.scrollHeight;
+  // OOB swaps (question fragment, history updates, grade-conflict bubble).
+  document.addEventListener("htmx:oobAfterSwap", function (e) {
+    if (e.target && e.target.id === "chat-messages") scrollChatToNewest();
   });
 
   // ----- Chat: Enter sends, Shift+Enter adds a newline -----
