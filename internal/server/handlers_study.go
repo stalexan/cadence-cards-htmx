@@ -339,10 +339,18 @@ func (s *Server) handleStudyGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sched, err := s.store.RecordReview(r.Context(), userID, scheduleID, sm2.Grade(grade), version, time.Now())
+	// A regrade rewinds the schedule to the state its last review started from
+	// before applying the new grade, so changing an answer never compounds.
+	record := s.store.RecordReview
+	if formStr(r, "regrade") == "1" {
+		record = s.store.RegradeReview
+	}
+	sched, err := record(r.Context(), userID, scheduleID, sm2.Grade(grade), version, time.Now())
 	if err != nil {
 		switch {
-		case errors.Is(err, store.ErrVersionConflict):
+		// No snapshot means the client's view of the card is stale; the
+		// conflict fragment already refetches it.
+		case errors.Is(err, store.ErrVersionConflict), errors.Is(err, store.ErrNoPreviousGrade):
 			// 409 whose body swaps in a self-refreshing grade area plus an
 			// OOB notice in the chat (htmx-config allows 409 swaps).
 			s.fragment(w, http.StatusConflict, "grade_conflict", gradeConflictData{Params: p})

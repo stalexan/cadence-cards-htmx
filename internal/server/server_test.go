@@ -266,6 +266,33 @@ func TestStudyLoop(t *testing.T) {
 		t.Errorf("post-grade schedule = %+v, %v", got, err)
 	}
 
+	// Change the grade: applied to the pre-grade state (the initial one here),
+	// so easiness stays 2.5 rather than keeping the 2.6 the first grade set,
+	// and the rep count does not advance a second time.
+	w = app.do("POST", fmt.Sprintf("/study/schedules/%d/grade", sched.ID), url.Values{
+		"topicId": {"1"}, "grade": {"CORRECT_WITH_HESITATION"}, "version": {"1"}, "regrade": {"1"},
+		"deckIds": {"1"}, "total": {"1"}, "completed": {"0"},
+	})
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "grade-on-yellow") {
+		t.Fatalf("regrade = %d, body %q", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `name="regrade" value="1"`) {
+		t.Error("graded fragment should stay regradable")
+	}
+	got, err = app.store.GetSchedule(context.Background(), 1, sched.ID)
+	if err != nil || got.Version != 2 || got.RepCount != 1 || got.Interval != 1 || got.Easiness < 2.49 || got.Easiness > 2.51 {
+		t.Errorf("regraded schedule = %+v, %v", got, err)
+	}
+
+	// Stale regrade -> the same 409 conflict fragment as a stale grade.
+	w = app.do("POST", fmt.Sprintf("/study/schedules/%d/grade", sched.ID), url.Values{
+		"topicId": {"1"}, "grade": {"INCORRECT"}, "version": {"1"}, "regrade": {"1"},
+		"deckIds": {"1"}, "total": {"1"}, "completed": {"0"},
+	})
+	if w.Code != http.StatusConflict {
+		t.Errorf("stale regrade = %d, want 409", w.Code)
+	}
+
 	// Stale grade -> 409 conflict fragment.
 	w = app.do("POST", fmt.Sprintf("/study/schedules/%d/grade", sched.ID), url.Values{
 		"topicId": {"1"}, "grade": {"INCORRECT"}, "version": {"0"},
@@ -287,6 +314,15 @@ func TestStudyLoop(t *testing.T) {
 	// Limit reached -> session complete even with cards due.
 	if _, err := app.store.ResetProgress(context.Background(), 1, sched.ID); err != nil {
 		t.Fatal(err)
+	}
+	// The reset dropped the pre-grade snapshot: a regrade now has nothing to
+	// rewind to and gets the refetch-the-card conflict fragment.
+	w = app.do("POST", fmt.Sprintf("/study/schedules/%d/grade", sched.ID), url.Values{
+		"topicId": {"1"}, "grade": {"INCORRECT"}, "version": {"3"}, "regrade": {"1"},
+		"deckIds": {"1"}, "total": {"1"}, "completed": {"0"},
+	})
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "updated elsewhere") {
+		t.Errorf("regrade without snapshot = %d, body %q", w.Code, w.Body.String())
 	}
 	w = app.do("GET", "/study/1/next?deckIds=1&limit=2&total=2&completed=2", nil)
 	if !strings.Contains(w.Body.String(), "Study Session Complete!") {

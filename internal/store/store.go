@@ -30,6 +30,9 @@ var (
 	ErrVersionConflict = errors.New("modified by another request")
 	// ErrDuplicate: unique-constraint violation on a user-visible name/email.
 	ErrDuplicate = errors.New("a record with this value already exists")
+	// ErrNoPreviousGrade: a regrade was asked for on a schedule with no
+	// pre-grade snapshot to rewind to (never graded, or reset since).
+	ErrNoPreviousGrade = errors.New("no previous grade to change")
 )
 
 // Store wraps the SQLite database.

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -226,6 +227,88 @@ func TestScheduleReviewAndConflict(t *testing.T) {
 	}
 	if reset.Version != got.Version+1 {
 		t.Errorf("reset version = %d, want %d", reset.Version, got.Version+1)
+	}
+}
+
+func TestScheduleRegrade(t *testing.T) {
+	s := newTestStore(t)
+	userID, _, deckID := seed(t, s, false)
+	c := mkCard(t, s, userID, deckID, "hola", sm2.PriorityA)
+	sched := *c.ForwardSchedule()
+
+	// Nothing reviewed yet -> nothing to change.
+	if _, err := s.RegradeReview(ctx, userID, sched.ID, sm2.GradeIncorrect, sched.Version, now); !errors.Is(err, ErrNoPreviousGrade) {
+		t.Errorf("regrade before any review: got %v, want ErrNoPreviousGrade", err)
+	}
+
+	// Two reviews of history, so the state the third one starts from is
+	// visibly different from the state it produces.
+	cur := sched
+	for i := 0; i < 2; i++ {
+		var err error
+		if cur, err = s.RecordReview(ctx, userID, sched.ID, sm2.GradeCorrectPerfectRecall, cur.Version, now); err != nil {
+			t.Fatalf("RecordReview %d: %v", i, err)
+		}
+	}
+	baseline := cur.State()
+
+	graded, err := s.RecordReview(ctx, userID, sched.ID, sm2.GradeCorrectPerfectRecall, cur.Version, now)
+	if err != nil {
+		t.Fatalf("RecordReview: %v", err)
+	}
+
+	sameState := func(t *testing.T, label string, got Schedule, want sm2.State) {
+		t.Helper()
+		if got.RepCount != want.RepCount || got.Interval != want.Interval ||
+			math.Abs(got.Easiness-want.Easiness) > 1e-9 ||
+			got.Grade == nil || *got.Grade != *want.Grade {
+			t.Errorf("%s = {easiness %v interval %d reps %d grade %v}, want {easiness %v interval %d reps %d grade %v}",
+				label, got.Easiness, got.Interval, got.RepCount, got.Grade,
+				want.Easiness, want.Interval, want.RepCount, *want.Grade)
+		}
+	}
+
+	// Changing the grade applies it to the *pre-grade* state, not to the state
+	// the first grade produced.
+	changed, err := s.RegradeReview(ctx, userID, sched.ID, sm2.GradeCorrectWithHesitation, graded.Version, now)
+	if err != nil {
+		t.Fatalf("RegradeReview: %v", err)
+	}
+	sameState(t, "regraded", changed, sm2.CalculateNextInterval(baseline, sm2.GradeCorrectWithHesitation, now))
+	if changed.Version != graded.Version+1 {
+		t.Errorf("regrade version = %d, want %d", changed.Version, graded.Version+1)
+	}
+	if compounded := sm2.CalculateNextInterval(graded.State(), sm2.GradeCorrectWithHesitation, now); changed.Interval == compounded.Interval && changed.Easiness == compounded.Easiness {
+		t.Errorf("regrade compounded on the graded state instead of rewinding: %+v", changed)
+	}
+
+	// Every further change re-derives from the same baseline, so cycling
+	// through the grades and back lands on the original values.
+	for _, g := range []sm2.Grade{sm2.GradeIncorrect, sm2.GradeCorrectPerfectRecall, sm2.GradeCorrectWithHesitation} {
+		next, err := s.RegradeReview(ctx, userID, sched.ID, g, changed.Version, now)
+		if err != nil {
+			t.Fatalf("RegradeReview(%s): %v", g, err)
+		}
+		sameState(t, "regraded "+string(g), next, sm2.CalculateNextInterval(baseline, g, now))
+		changed = next
+	}
+
+	// Stale version -> conflict; another user can't touch it.
+	if _, err := s.RegradeReview(ctx, userID, sched.ID, sm2.GradeIncorrect, graded.Version, now); !errors.Is(err, ErrVersionConflict) {
+		t.Errorf("stale regrade: got %v, want ErrVersionConflict", err)
+	}
+	u2, _ := s.CreateUser(ctx, "Other", "other4@example.com", "h")
+	if _, err := s.RegradeReview(ctx, u2.ID, sched.ID, sm2.GradeIncorrect, changed.Version, now); !errors.Is(err, ErrNotFound) {
+		t.Errorf("cross-user regrade: got %v, want ErrNotFound", err)
+	}
+
+	// A reset drops the snapshot: there is no longer a review to change.
+	reset, err := s.ResetProgress(ctx, userID, sched.ID)
+	if err != nil {
+		t.Fatalf("ResetProgress: %v", err)
+	}
+	if _, err := s.RegradeReview(ctx, userID, sched.ID, sm2.GradeIncorrect, reset.Version, now); !errors.Is(err, ErrNoPreviousGrade) {
+		t.Errorf("regrade after reset: got %v, want ErrNoPreviousGrade", err)
 	}
 }
 

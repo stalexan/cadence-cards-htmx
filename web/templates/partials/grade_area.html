@@ -2,47 +2,47 @@
      Context: gradeAreaData (or an equivalent dict from study_card.html).
 
      Vertical stack, best-first, matching the reference — the previous version
-     was a horizontal row of tinted pills, worst-first. */}}
+     was a horizontal row of tinted pills, worst-first.
+
+     The buttons stay live after grading, with the chosen one tinted: posting a
+     different grade with regrade=1 rewinds the schedule to the state the review
+     started from and applies the new grade instead of compounding on it. The
+     version re-rendered here is the bumped one, so the optimistic-locking chain
+     survives any number of changes. */}}
 {{define "grade_area"}}
 {{$p := .Params}}
 <div id="grade-area" class="grade-area">
   <h3 class="grade-heading">Rate Your Recall</h3>
-  {{if .Graded}}
-  <div class="grade-buttons">
-    <button class="grade-btn{{if eq .Grade "CORRECT_PERFECT_RECALL"}} grade-on-green{{end}}" disabled>
-      {{template "icon-check-circle"}}Perfect Recall<span class="grade-hint">(I knew it immediately)</span>
-    </button>
-    <button class="grade-btn{{if eq .Grade "CORRECT_WITH_HESITATION"}} grade-on-yellow{{end}}" disabled>
-      {{template "icon-help-circle"}}Correct with Hesitation<span class="grade-hint">(I had to think)</span>
-    </button>
-    <button class="grade-btn{{if eq .Grade "INCORRECT"}} grade-on-red{{end}}" disabled>
-      {{template "icon-x-circle"}}Incorrect<span class="grade-hint">(I didn't remember)</span>
-    </button>
-  </div>
-  <p class="grade-note">Graded. Next review in {{.NewInterval}} day{{if ne .NewInterval 1}}s{{end}}.</p>
-  <div class="grade-next">
-    <button class="btn btn-primary btn-block"
-            hx-get="{{$p.NextURL (add $p.Completed 1)}}"
-            hx-target="#study-area" hx-swap="innerHTML">Next Card{{template "icon-arrow-right"}}</button>
-  </div>
-  {{else}}
   <form class="grade-buttons"
         hx-post="/study/schedules/{{.ScheduleID}}/grade"
         hx-target="#grade-area" hx-swap="outerHTML"
         hx-disabled-elt="find button">
     <input type="hidden" name="topicId" value="{{$p.TopicID}}">
     <input type="hidden" name="version" value="{{.Version}}">
+    {{if .Graded}}<input type="hidden" name="regrade" value="1">{{end}}
     {{template "study_params_hidden" (dict "Params" $p "Completed" $p.Completed)}}
-    <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL" class="grade-btn">
+    <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL"
+            class="grade-btn{{if eq .Grade "CORRECT_PERFECT_RECALL"}} grade-on-green{{end}}">
       {{template "icon-check-circle"}}Perfect Recall<span class="grade-hint">(I knew it immediately)</span>
     </button>
-    <button type="submit" name="grade" value="CORRECT_WITH_HESITATION" class="grade-btn">
+    <button type="submit" name="grade" value="CORRECT_WITH_HESITATION"
+            class="grade-btn{{if eq .Grade "CORRECT_WITH_HESITATION"}} grade-on-yellow{{end}}">
       {{template "icon-help-circle"}}Correct with Hesitation<span class="grade-hint">(I had to think)</span>
     </button>
-    <button type="submit" name="grade" value="INCORRECT" class="grade-btn">
+    <button type="submit" name="grade" value="INCORRECT"
+            class="grade-btn{{if eq .Grade "INCORRECT"}} grade-on-red{{end}}">
       {{template "icon-x-circle"}}Incorrect<span class="grade-hint">(I didn't remember)</span>
     </button>
   </form>
+  {{if .Graded}}
+  <p class="grade-note">Graded. Next review in {{.NewInterval}} day{{if ne .NewInterval 1}}s{{end}}.
+    <span class="grade-subnote">Click another rating to change it.</span></p>
+  <div class="grade-next">
+    <button class="btn btn-primary btn-block"
+            hx-get="{{$p.NextURL (add $p.Completed 1)}}"
+            hx-target="#study-area" hx-swap="innerHTML">Next Card{{template "icon-arrow-right"}}</button>
+  </div>
+  {{else}}
   <div class="grade-next">
     <button class="btn btn-secondary btn-block"
             hx-get="{{$p.NextURL $p.Completed}}"
