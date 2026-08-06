@@ -33,6 +33,15 @@ docker compose up -d --build
 There is no frontend build step: `web/templates` and `web/static` are embedded
 via `go:embed` and served from the binary. Editing them requires a rebuild.
 
+### Leave nothing running
+
+**The user starts the app.** Don't run `go run ./cmd/cadence` or `docker compose up` to hand over a
+live instance — say what to start and let them start it. If you need a server for your own
+verification, run it on a non-default port against a throwaway `DB_PATH` (never `./dev.db`), and
+**kill it before you finish the task**, not at the start of the next one. The same goes for any
+other background process, watcher, or container you start: clean up in the turn that created it, and
+say so. Ending a turn with something still listening is a bug.
+
 ## Architecture
 
 Request flow: **middleware chain → handler → store → SQLite**, with templates rendered server-side
