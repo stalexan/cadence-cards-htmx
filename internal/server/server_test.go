@@ -412,6 +412,46 @@ func TestImportEndpoint(t *testing.T) {
 	if !strings.Contains(body, "Imported 1 card") || !strings.Contains(body, "Card at index 1") {
 		t.Errorf("import result wrong: %s", body)
 	}
+	if strings.Contains(body, "switched to bidirectional") {
+		t.Errorf("no reverse params, deck should not flip: %s", body)
+	}
+}
+
+// TestImportEndpointReverseParams covers YAML carrying both directions' SM-2
+// state: the reverse schedule is stored and the deck is flipped bidirectional
+// so it is actually studied.
+func TestImportEndpointReverseParams(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+
+	yaml := "- Front: ABCs\n  Back: abecedario\n  Priority: A\n  Tags: []\n" +
+		"  LastSeen: 2026-06-23\n  Grade: CORRECT_PERFECT_RECALL\n  RepCount: 4\n  Easiness: 2.9\n  Interval: 49\n" +
+		"  ReverseLastSeen: 2026-06-23\n  ReverseGrade: CORRECT_PERFECT_RECALL\n  ReverseRepCount: 4\n" +
+		"  ReverseEasiness: 2.9\n  ReverseInterval: 49\n"
+	w := app.do("POST", "/import", url.Values{"deckId": {"1"}, "yamlContent": {yaml}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("import = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Imported 1 card") || !strings.Contains(body, "switched to bidirectional") {
+		t.Errorf("import result wrong: %s", body)
+	}
+
+	cards, _, err := app.store.ListCards(context.Background(), 1, store.CardListParams{})
+	if err != nil {
+		t.Fatalf("ListCards: %v", err)
+	}
+	var imported store.Card
+	for _, c := range cards {
+		if c.Front == "ABCs" {
+			imported = c
+		}
+	}
+	rev := imported.ReverseSchedule()
+	if rev == nil || rev.RepCount != 4 || rev.Easiness != 2.9 || rev.Interval != 49 {
+		t.Errorf("imported reverse schedule = %+v", rev)
+	}
 }
 
 func TestHealthNoAuth(t *testing.T) {

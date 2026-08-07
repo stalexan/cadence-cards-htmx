@@ -288,6 +288,100 @@ func TestImportSvelteExportFixture(t *testing.T) {
 	}
 }
 
+// TestImportBothDirectionsFixture pins the fully-populated shape now produced
+// for bidirectional decks: every card carries real values for both directions,
+// with an integer where a float is expected and a block-scalar Note.
+func TestImportBothDirectionsFixture(t *testing.T) {
+	fixture := `- ID: 1
+  Front: ABCs
+  Back: abecedario
+  Note: alphabet is alfabeto
+  Priority: A
+  Tags: []
+  LastSeen: 2026-06-23
+  Grade: CORRECT_PERFECT_RECALL
+  RepCount: 4
+  Easiness: 2.9
+  Interval: 49
+  ReverseLastSeen: 2026-06-23
+  ReverseGrade: CORRECT_PERFECT_RECALL
+  ReverseRepCount: 4
+  ReverseEasiness: 2.9
+  ReverseInterval: 49
+- ID: 2
+  Front: abortion
+  Back: aborto, interrupción del embarazo
+  Note: |-
+    - "El aborto" is the standard, most common term
+    - The verb "to abort" is "abortar"
+  Priority: A
+  Tags: []
+  LastSeen: 2025-11-15
+  Grade: CORRECT_PERFECT_RECALL
+  RepCount: 6
+  Easiness: 3.08
+  Interval: 422
+  ReverseLastSeen: 2026-04-18
+  ReverseGrade: CORRECT_PERFECT_RECALL
+  ReverseRepCount: 5
+  ReverseEasiness: 3
+  ReverseInterval: 147
+`
+	valid, invalid, err := Import(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invalid) != 0 || len(valid) != 2 {
+		t.Fatalf("valid=%d invalid=%+v", len(valid), invalid)
+	}
+
+	for i, c := range valid {
+		if !c.HasReverse {
+			t.Errorf("card %d: HasReverse = false", i)
+		}
+	}
+
+	fwd, err := valid[0].ForwardState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 6, 23, 0, 0, 0, 0, time.UTC)
+	if fwd.RepCount != 4 || fwd.Easiness != 2.9 || fwd.Interval != 49 ||
+		fwd.Grade == nil || *fwd.Grade != sm2.GradeCorrectPerfectRecall ||
+		fwd.LastSeen == nil || !fwd.LastSeen.Equal(want) {
+		t.Errorf("card 0 forward = %+v", fwd)
+	}
+	rev, err := valid[0].ReverseState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev == nil || rev.RepCount != 4 || rev.Easiness != 2.9 || rev.Interval != 49 ||
+		rev.Grade == nil || *rev.Grade != sm2.GradeCorrectPerfectRecall ||
+		rev.LastSeen == nil || !rev.LastSeen.Equal(want) {
+		t.Errorf("card 0 reverse = %+v", rev)
+	}
+
+	// The two directions diverge on card 2, and ReverseEasiness is written as
+	// an integer.
+	fwd2, _ := valid[1].ForwardState()
+	if fwd2.Easiness != 3.08 || fwd2.Interval != 422 || fwd2.RepCount != 6 {
+		t.Errorf("card 1 forward = %+v", fwd2)
+	}
+	rev2, err := valid[1].ReverseState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev2 == nil || rev2.Easiness != 3 || rev2.Interval != 147 || rev2.RepCount != 5 {
+		t.Errorf("card 1 reverse = %+v", rev2)
+	}
+	if rev2.LastSeen == nil || !rev2.LastSeen.Equal(time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("card 1 ReverseLastSeen = %v", rev2.LastSeen)
+	}
+	if valid[1].Note == nil || !strings.Contains(*valid[1].Note, "\n") {
+		t.Errorf("block-scalar note = %v", valid[1].Note)
+	}
+}
+
 // TestExportGolden pins the exact bytes of the Go exporter for a
 // representative deck so format drift is caught.
 func TestExportGolden(t *testing.T) {

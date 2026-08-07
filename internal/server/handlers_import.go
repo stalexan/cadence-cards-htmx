@@ -25,6 +25,9 @@ type importResultData struct {
 	FailedCount   int
 	Errors        []string
 	DeckName      string
+	// MadeBidirectional is set when the YAML's reverse SM-2 params switched
+	// a unidirectional deck over, so the user knows the deck changed.
+	MadeBidirectional bool
 }
 
 func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
@@ -108,10 +111,12 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(params) > 0 {
-		if err := s.store.ImportCards(r.Context(), userID, deckID, params); err != nil {
+		madeBidirectional, err := s.store.ImportCards(r.Context(), userID, deckID, params)
+		if err != nil {
 			s.storeError(w, r, err)
 			return
 		}
+		result.MadeBidirectional = madeBidirectional
 	}
 
 	result.Success = len(params) > 0

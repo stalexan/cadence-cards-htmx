@@ -486,6 +486,7 @@ func TestStudyFilters(t *testing.T) {
 func TestImportCards(t *testing.T) {
 	s := newTestStore(t)
 	userID, _, deckID := seed(t, s, false)
+	existing := mkCard(t, s, userID, deckID, "already here", sm2.PriorityA)
 
 	lastSeen := time.Date(2026, 7, 1, 0, 0, 0, 0, time.Local)
 	grade := sm2.GradeCorrectPerfectRecall
@@ -498,12 +499,16 @@ func TestImportCards(t *testing.T) {
 			Reverse: &sm2.State{LastSeen: &lastSeen, Grade: &revGrade, RepCount: 1, Easiness: 2.5, Interval: 1},
 		},
 	}
-	if err := s.ImportCards(ctx, userID, deckID, cards); err != nil {
+	madeBidir, err := s.ImportCards(ctx, userID, deckID, cards)
+	if err != nil {
 		t.Fatalf("ImportCards: %v", err)
+	}
+	if !madeBidir {
+		t.Error("reverse params imported into a unidirectional deck: madeBidirectional = false")
 	}
 
 	got, total, err := s.ListCards(ctx, userID, CardListParams{})
-	if err != nil || total != 2 {
+	if err != nil || total != 3 {
 		t.Fatalf("after import: (%d, %v)", total, err)
 	}
 	var practiced Card
@@ -519,16 +524,63 @@ func TestImportCards(t *testing.T) {
 	if fwd.LastSeen == nil || !fwd.LastSeen.Equal(lastSeen) {
 		t.Errorf("imported lastSeen = %v, want %v", fwd.LastSeen, lastSeen)
 	}
-	// Reverse params present -> reverse schedule created even in a unidirectional deck.
+	// Reverse params present -> reverse schedule carries the imported state.
 	rev := practiced.ReverseSchedule()
 	if rev == nil || rev.RepCount != 1 || *rev.Grade != revGrade {
 		t.Errorf("imported reverse state = %+v", rev)
 	}
 
+	// The deck was flipped bidirectional, so cards that predate the import are
+	// back-filled with a reverse schedule at the initial state.
+	deck, err := s.GetDeck(ctx, userID, deckID)
+	if err != nil || !deck.IsBidirectional {
+		t.Fatalf("deck after import: bidirectional = %v (err %v)", deck.IsBidirectional, err)
+	}
+	var backfilled Card
+	for _, c := range got {
+		if c.ID == existing.ID {
+			backfilled = c
+		}
+	}
+	exRev := backfilled.ReverseSchedule()
+	init := sm2.InitialState()
+	if exRev == nil || exRev.Grade != nil || exRev.RepCount != init.RepCount ||
+		exRev.Easiness != init.Easiness || exRev.Interval != init.Interval {
+		t.Errorf("back-filled reverse state = %+v, want initial", exRev)
+	}
+
 	// Import into someone else's deck fails.
 	u2, _ := s.CreateUser(ctx, "Other", "other5@example.com", "h")
-	if err := s.ImportCards(ctx, u2.ID, deckID, cards[:1]); !errors.Is(err, ErrNotFound) {
+	if _, err := s.ImportCards(ctx, u2.ID, deckID, cards[:1]); !errors.Is(err, ErrNotFound) {
 		t.Errorf("cross-user import: got %v, want ErrNotFound", err)
+	}
+}
+
+// TestImportCardsNoReverseKeepsDeckUnidirectional pins the other half of the
+// rule: only reverse params flip the deck.
+func TestImportCardsNoReverseKeepsDeckUnidirectional(t *testing.T) {
+	s := newTestStore(t)
+	userID, _, deckID := seed(t, s, false)
+
+	madeBidir, err := s.ImportCards(ctx, userID, deckID, []ImportCardParams{
+		{Front: "plain", Back: "b", Priority: sm2.PriorityA, Forward: sm2.InitialState()},
+	})
+	if err != nil {
+		t.Fatalf("ImportCards: %v", err)
+	}
+	if madeBidir {
+		t.Error("madeBidirectional = true without any reverse params")
+	}
+	deck, err := s.GetDeck(ctx, userID, deckID)
+	if err != nil || deck.IsBidirectional {
+		t.Fatalf("deck bidirectional = %v (err %v), want false", deck.IsBidirectional, err)
+	}
+	got, _, err := s.ListCards(ctx, userID, CardListParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev := got[0].ReverseSchedule(); rev != nil {
+		t.Errorf("unexpected reverse schedule = %+v", rev)
 	}
 }
 

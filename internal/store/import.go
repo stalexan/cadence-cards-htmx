@@ -24,8 +24,15 @@ type ImportCardParams struct {
 // verifying deck ownership (port of import-service importCards). A reverse
 // schedule is created when the deck is bidirectional or the YAML carried
 // reverse SM-2 params.
-func (s *Store) ImportCards(ctx context.Context, userID, deckID int64, cards []ImportCardParams) error {
-	return s.inTx(ctx, func(tx *sql.Tx) error {
+//
+// Reverse params in the file are a statement that the deck is studied both
+// ways, so a unidirectional deck is switched to bidirectional (back-filling
+// reverse schedules for its existing cards, as UpdateDeck does) — otherwise
+// dueSchedules would silently skip everything just imported. The returned bool
+// reports whether that switch happened.
+func (s *Store) ImportCards(ctx context.Context, userID, deckID int64, cards []ImportCardParams) (bool, error) {
+	var madeBidirectional bool
+	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		var bidir int
 		err := tx.QueryRowContext(ctx, `
 			SELECT d.is_bidirectional FROM decks d
@@ -36,6 +43,27 @@ func (s *Store) ImportCards(ctx context.Context, userID, deckID int64, cards []I
 		}
 		if err != nil {
 			return err
+		}
+
+		if bidir == 0 && anyReverse(cards) {
+			// Back-fill reverse schedules for cards already in the deck; the
+			// imported ones get theirs in the loop below.
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO schedules (card_id, is_reversed)
+				SELECT c.id, 1 FROM cards c
+				WHERE c.deck_id = ?
+				  AND NOT EXISTS (SELECT 1 FROM schedules s WHERE s.card_id = c.id AND s.is_reversed = 1)`,
+				deckID); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE decks SET is_bidirectional = 1,
+				       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+				WHERE id = ?`, deckID); err != nil {
+				return err
+			}
+			bidir = 1
+			madeBidirectional = true
 		}
 
 		for _, p := range cards {
@@ -75,4 +103,15 @@ func (s *Store) ImportCards(ctx context.Context, userID, deckID int64, cards []I
 		}
 		return nil
 	})
+	return madeBidirectional, err
+}
+
+// anyReverse reports whether any card carried reverse SM-2 params.
+func anyReverse(cards []ImportCardParams) bool {
+	for _, p := range cards {
+		if p.Reverse != nil {
+			return true
+		}
+	}
+	return false
 }

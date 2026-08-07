@@ -121,7 +121,9 @@ docker compose cp app:/data/cadence.db backup-$(date +%F).db
 
 No database migration is needed: export each deck from the Svelte app (Share → include SM-2 params)
 and paste the YAML into **Import** here. Study progress, tags, and reverse-direction schedules
-survive the round trip.
+survive the round trip. If the YAML carries reverse SM-2 params (`ReverseLastSeen`, `ReverseGrade`,
+…), the target deck is switched to bidirectional so that progress is actually studied — its existing
+cards get a reverse schedule at the initial state.
 
 ## Layout
 
