@@ -62,6 +62,13 @@
               <p>{{.}}</p>
             </div>
             {{end}}
+            {{/* Inside the panel so it only appears with the answer. New tab on
+                 purpose: the session lives in the query string and the chat
+                 history only in this DOM, so navigating away would lose both. */}}
+            <div class="answer-sep">
+              <a class="link-indigo" href="/cards/{{$item.CardID}}" target="_blank"
+                 rel="noopener">View Card Details{{template "icon-external-link"}}</a>
+            </div>
           </div>
         </div>
       </div>

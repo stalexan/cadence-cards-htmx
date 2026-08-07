@@ -231,7 +231,10 @@ func TestStudyLoop(t *testing.T) {
 		t.Fatalf("next = %d", w.Code)
 	}
 	body := w.Body.String()
-	for _, want := range []string{"hola", `hx-post="/study/1/question"`, "grade-area", `name="version" value="0"`} {
+	for _, want := range []string{
+		"hola", `hx-post="/study/1/question"`, "grade-area", `name="version" value="0"`,
+		fmt.Sprintf(`href="/cards/%d"`, card.ID), `target="_blank"`,
+	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("next fragment missing %q", want)
 		}
