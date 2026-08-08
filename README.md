@@ -6,13 +6,9 @@ answer, Claude tells you what you got right and where you were fuzzy, and then y
 The whole thing is a single Go binary and one SQLite file — one container to run, one file to back
 up, no NPM, no build step.
 
-<!-- Screenshots -->
-<!--
-  Suggested shots to add here:
-    - a study session mid-conversation (card panel + Claude chat)
-    - the card table with filters applied
-    - a deck page with the share/export dialog open
--->
+<img src="docs/images/01-study-session.png" width="700"
+     alt="A study session: the card panel on the left with grade buttons, and Claude's chat on the
+          right explaining a Spanish subjunctive answer">
 
 ## Features
 
@@ -99,6 +95,10 @@ view you're looking at is a link you can share or bookmark:
 - **Sort** by front, deck, priority, or last-seen date.
 - **25 per page**, with full pagination.
 
+<img src="docs/images/02-cards-table-with-filter.png" width="700"
+     alt="The Cards page with a search term entered, showing the filter row for topic, deck, tag and
+          priority above the matching results">
+
 ### Import and export
 
 - **Export** any deck as YAML, with or without SM-2 study progress. Copy it from a dialog or
@@ -108,6 +108,10 @@ view you're looking at is a link you can share or bookmark:
   rather than aborting the whole file.
 - If the YAML carries reverse-direction SM-2 parameters and the target deck is one-directional, the
   deck is switched to bidirectional so that progress is actually used.
+
+<img src="docs/images/03-export-deck.png" width="700"
+     alt="The export dialog on a deck page, with an Include SM-2 study progress checkbox, a preview
+          of the generated YAML, and Copy and Download buttons">
 
 The format is a plain YAML list, optionally preceded by a `#` comment header:
 
