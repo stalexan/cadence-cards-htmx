@@ -331,5 +331,4 @@ web/static/           htmx.min.js (vendored), app.css, app.js, favicon
 
 ## License
 
-This repository does not currently include a LICENSE file, which means default copyright applies —
-all rights reserved. If you intend to publish or share it, add a license explicitly.
+[MIT](LICENSE) © 2026 Sean Alexandre
