@@ -19,8 +19,8 @@ type Config struct {
 
 	// Claude API
 	ClaudeAPIKey    string // CLAUDE_API_KEY
-	ClaudeModel     string // CLAUDE_MODEL, default claude-opus-4-8
-	ClaudeMaxTokens int    // CLAUDE_MAX_TOKENS, fallback 1000 (matches client.ts)
+	ClaudeModel     string // CLAUDE_MODEL, default claude-opus-5
+	ClaudeMaxTokens int    // CLAUDE_MAX_TOKENS, fallback 16000 (caps thinking + reply)
 
 	EnablePublicRegistration bool // ENABLE_PUBLIC_REGISTRATION
 	DisableRateLimiting      bool // DISABLE_RATE_LIMITING
@@ -45,8 +45,8 @@ func Load() (Config, error) {
 		Port:                     3000,
 		DBPath:                   "/data/cadence.db",
 		ClaudeAPIKey:             os.Getenv("CLAUDE_API_KEY"),
-		ClaudeModel:              "claude-opus-4-8",
-		ClaudeMaxTokens:          1000,
+		ClaudeModel:              "claude-opus-5",
+		ClaudeMaxTokens:          16000,
 		EnablePublicRegistration: os.Getenv("ENABLE_PUBLIC_REGISTRATION") == "true",
 		DisableRateLimiting:      os.Getenv("DISABLE_RATE_LIMITING") == "true",
 		CookieSecure:             true,

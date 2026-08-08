@@ -4,6 +4,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -13,6 +14,11 @@ import (
 
 	"cadence-cards/internal/config"
 )
+
+// ErrRefused reports that Claude's safety classifiers declined the request.
+// It arrives as a successful response with no text block, so handlers must
+// treat it like any other AI failure rather than rendering an empty reply.
+var ErrRefused = errors.New("claude declined the request")
 
 // Message is one visible chat turn.
 type Message struct {
@@ -102,6 +108,13 @@ func (c *Client) generateText(ctx context.Context, system string, msgs []Message
 		"inputTokens", resp.Usage.InputTokens,
 		"outputTokens", resp.Usage.OutputTokens,
 	)
+
+	// A safety-classifier refusal is an HTTP 200 with no text block, so it has
+	// to be caught here or it renders as an empty chat bubble.
+	if resp.StopReason == anthropic.StopReasonRefusal {
+		slog.Warn("claude declined the request", "model", c.model)
+		return "", ErrRefused
+	}
 
 	for _, block := range resp.Content {
 		if block.Type == "text" {
