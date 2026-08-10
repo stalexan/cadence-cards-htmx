@@ -278,18 +278,58 @@ docker compose run --rm app -create-user you@example.com
 The SQLite database lives at `/data/cadence.db` in the `cadence_data` volume. There is nothing else
 to back up — no uploads, no external state.
 
+`cadence -backup` writes a consistent snapshot to a path, or to stdout with `-`. It is safe to run
+against the live server, so it suits a cron job or systemd timer:
+
 ```bash
-docker compose cp app:/data/cadence.db backup-$(date +%F).db
+docker compose exec -T app cadence -backup - > cadence-$(date -u +%Y%m%dT%H%M%SZ).db
+docker compose exec -T app cadence -backup - | gzip -9 > cadence-$(date -u +%Y%m%dT%H%M%SZ).db.gz
 ```
 
-**Caveat:** the database runs in WAL mode, so copying `cadence.db` alone from a *running* container
-can miss recent commits still sitting in the write-ahead log. For a guaranteed-consistent copy,
-either stop the container first, or copy all three of `cadence.db`, `cadence.db-wal`, and
-`cadence.db-shm` together. (The runtime image doesn't ship the `sqlite3` CLI, so `.backup` /
-`VACUUM INTO` have to be run from the host.)
+The snapshot is taken with `VACUUM INTO` inside a read transaction, so it neither blocks the server
+nor is blocked by it, and — the part that matters — it reads *through* the write-ahead log, so
+commits that haven't been checkpointed yet are included. It comes out as one compacted file with no
+`.db-wal`/`.db-shm` sidecars, so restoring it is a single move. **Copying `cadence.db` on its own
+from a running container is not a backup**: most of a busy database can be sitting in the WAL, and
+the copy will open cleanly while missing it. (With the container *stopped*, a plain file copy is
+fine.)
+
+**`-T` is required, not cosmetic.** Without it Docker allocates a TTY, which merges the container's
+stderr into stdout and translates line endings — silently corrupting the file. With `-T` the two
+streams stay separate, which is what makes it safe for the snapshot to own stdout while log output
+goes to stderr. The command exits non-zero on any failure, having verified the snapshot with
+`PRAGMA quick_check` before handing it over.
+
+Passing a path instead of `-` writes the file inside the container, and also works against a stopped
+stack via `docker compose run --rm app -backup /data/snapshot.db`.
+
+Snapshots contain bcrypt password hashes and session tokens: store them mode `0600`, and keep a copy
+somewhere other than this host — a backup on the same disk isn't one.
+
+#### Restoring
+
+The obvious `docker compose cp backup.db app:/data/cadence.db` is wrong twice over. It leaves the
+*old* `cadence.db-wal` beside the new file, which SQLite replays on the next start, corrupting the
+restore; and it writes the file as the host user, while the app runs as uid 10001 — and nothing in
+the container can `chown` it back, because `cap_drop: [ALL]` removes `CAP_CHOWN` even for root.
+Streaming it in on stdin avoids both, since every file is created inside the container:
+
+```bash
+docker compose stop app
+docker compose run --rm -T --no-deps --entrypoint sh app -c '
+    set -e
+    gunzip > /data/restore.tmp
+    rm -f /data/cadence.db /data/cadence.db-wal /data/cadence.db-shm
+    mv /data/restore.tmp /data/cadence.db
+' < cadence-backup.db.gz
+docker compose start app
+docker compose exec -T app cadence -backup - > /dev/null   # proves it opens and reads end to end
+```
+
+Use `cat` in place of `gunzip` for an uncompressed snapshot.
 
 Expired sessions and stale rate-limiter entries are cleaned up automatically every hour; no cron
-job or maintenance task is needed.
+job or maintenance task is needed for those.
 
 ## How it's built
 
@@ -320,7 +360,7 @@ enough; inline variables remain handy for one-off overrides (`CLAUDE_MAX_TOKENS=
 ./cmd/cadence`).
 
 ```
-cmd/cadence/          entrypoint (+ -create-user CLI)
+cmd/cadence/          entrypoint (+ -create-user and -backup CLI)
 internal/config/      env configuration
 internal/sm2/         SM-2 algorithm (pure, with its tests)
 internal/yamlio/      YAML export/import

@@ -141,6 +141,8 @@ millisecond precision (`store.timeFormat`).
 Compose joins an **external** network (`SHARED_NETWORK_NAME`, default `cadence-cards-shared`) with
 alias `cadence-cards`, so the existing external nginx (set up for the Svelte app) proxies to
 `cadence-cards:3000` unchanged.  The SQLite file lives in the `cadence_data` volume
-(`/data/cadence.db`); backup is a file copy. `TZ` should be set to the users' timezone for correct
+(`/data/cadence.db`); back it up with `docker compose exec -T app cadence -backup -`, which snapshots
+via `VACUUM INTO` (WAL-safe against the live server, and deliberately non-migrating — `exec` runs the
+*image's* binary, which can be newer than the running one). `TZ` should be set to the users' timezone for correct
 SM-2 due dates. There is no `AUTH_SECRET` — sessions are random server-side tokens (SHA-256-hashed
 at rest in the `sessions` table).

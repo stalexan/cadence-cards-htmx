@@ -40,18 +40,56 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open opens (creating if needed) the SQLite database at path and applies
-// pending migrations. Pragmas: WAL, foreign keys, busy timeout, NORMAL sync.
-func Open(path string) (*Store, error) {
-	dsn := fmt.Sprintf("file:%s?%s", path, url.Values{
-		"_pragma": []string{
+// openMode selects the pragma set for a connection.  Only the server opens the
+// database to serve traffic; the other two exist for backups (see backup.go).
+type openMode int
+
+const (
+	modeServer openMode = iota // read-write, serving requests
+	modeBackup                 // read-write but never migrating, snapshotting a live database
+	modeVerify                 // read-only, checking a finished snapshot
+)
+
+// dsn builds the connection string for a mode.
+func dsn(path string, mode openMode) string {
+	q := url.Values{}
+	switch mode {
+	case modeServer:
+		q["_pragma"] = []string{
 			"journal_mode(WAL)",
 			"foreign_keys(ON)",
 			"busy_timeout(5000)",
 			"synchronous(NORMAL)",
-		},
-	}.Encode())
-	db, err := sql.Open("sqlite", dsn)
+		}
+	case modeBackup:
+		// Read-write even though a backup only reads: a read-only connection
+		// cannot create the -shm file, so it cannot recover a -wal left behind by
+		// a crashed process — which is exactly the backup that most needs to
+		// succeed.  The longer busy timeout is deliberate: no user is waiting on
+		// a backup, so it can afford to sit out a lock.
+		q["_pragma"] = []string{
+			"journal_mode(WAL)",
+			"foreign_keys(ON)",
+			"busy_timeout(30000)",
+			"synchronous(NORMAL)",
+		}
+	case modeVerify:
+		// A freshly vacuumed snapshot has no WAL, so read-only is safe here and
+		// guarantees the check cannot touch what was just produced.  journal_mode
+		// is omitted because setting it writes the database header, which a
+		// read-only connection cannot do.
+		q.Set("mode", "ro")
+		q["_pragma"] = []string{
+			"foreign_keys(ON)",
+			"busy_timeout(30000)",
+		}
+	}
+	return fmt.Sprintf("file:%s?%s", path, q.Encode())
+}
+
+// open connects and pings, without applying migrations.
+func open(path string, mode openMode) (*Store, error) {
+	db, err := sql.Open("sqlite", dsn(path, mode))
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
@@ -62,9 +100,18 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
-	s := &Store{db: db}
+	return &Store{db: db}, nil
+}
+
+// Open opens (creating if needed) the SQLite database at path and applies
+// pending migrations. Pragmas: WAL, foreign keys, busy timeout, NORMAL sync.
+func Open(path string) (*Store, error) {
+	s, err := open(path, modeServer)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		s.db.Close()
 		return nil, err
 	}
 	return s, nil
