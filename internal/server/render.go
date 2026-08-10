@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	cadence "cadence-cards"
 	"cadence-cards/internal/markdown"
 	"cadence-cards/internal/store"
 	"cadence-cards/web"
@@ -152,12 +153,14 @@ func buildTemplates() (pages map[string]*template.Template, partials *template.T
 
 // pageData wraps every full-page render.
 type pageData struct {
-	User       *store.User
-	Path       string
+	User *store.User
+	Path string
+	// AppVersion is the release number embedded from the repo-root VERSION
+	// file. It is a property of the binary, not of the environment.
 	AppVersion string
 	// AssetVersion fingerprints web/static so the layouts can bust the cache
-	// on /static URLs. Distinct from AppVersion, which is informational and
-	// empty unless APP_VERSION is set.
+	// on /static URLs. Deliberately distinct from AppVersion: it tracks asset
+	// content, not releases.
 	AssetVersion string
 	Data         any
 }
@@ -172,7 +175,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	pd := pageData{
 		User:         userFrom(r),
 		Path:         r.URL.Path,
-		AppVersion:   s.cfg.AppVersion,
+		AppVersion:   cadence.Version,
 		AssetVersion: s.assetVersion,
 		Data:         data,
 	}

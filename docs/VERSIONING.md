@@ -57,47 +57,65 @@ Note: The VERSION file contains the raw version number (e.g., 1.0.3), while git
 tags are prefixed with v (e.g., v1.0.3) by convention to distinguish them as
 version tags.
 
-### The VERSION file is not read by the binary
+### The VERSION file is the source of truth
 
-The file is a git-side record only. Nothing in the build embeds it. What the
-running app reports comes from the `APP_VERSION` environment variable, which
-`internal/config` reads into `cfg.AppVersion` and `cmd/cadence` logs on startup:
+The file is embedded into the binary at build time. `version.go` at the
+repository root does:
+
+```go
+//go:embed VERSION
+var versionFile string
+
+var Version = strings.TrimSpace(versionFile)
+```
+
+Everything that reports a version reads `cadence.Version` — the startup log
+line in `cmd/cadence`, the sidebar badge via `internal/server/render.go`, and
+the `-version` flag. **Nothing at runtime can override it.** There is no
+`APP_VERSION` environment variable; a leftover `APP_VERSION=` in a local `.env`
+is simply ignored.
 
 ```
 {"msg":"cadence-cards listening","port":3000,"version":"1.0.3",...}
 ```
 
-`docker-compose.yml` passes `APP_VERSION=${APP_VERSION:-}` through to the
-container, so the value comes from the deploy environment or `./.env`. It
-defaults to empty, and an unset or stale `APP_VERSION` is silently accepted —
-the app logs whatever it is given, including nothing at all.
+This is why the file lives at the repository root rather than under a package:
+Go's `embed` cannot reference paths outside the embedding package's directory
+and rejects symlinks, so the root `VERSION` needs a root package to embed it.
+Deriving the version from git instead is not an option — `.dockerignore`
+excludes `.git`, so the build cannot run `git describe`.
 
-**So a release is two edits, not one:** bump `VERSION`, and bump `APP_VERSION`
-in the deployment's `.env` (`.env.example` carries a sample value that should
-move with it). If these drift, the git history and the running app disagree
-about what is deployed.
+**A release is therefore one edit:** bump `VERSION`. The number the app reports
+cannot disagree with the number git records, because there is only one number.
 
 ### Creating a New Version
 
 1. **Update the VERSION file:**
    ```bash
-   echo "1.0.3" > VERSION
+   echo "1.0.4" > VERSION
    ```
 
-2. **Update `APP_VERSION` to match**, in `.env.example` and in the `.env` of
-   any deployment, so the running app reports the same number.
-
-3. **Commit the version change:**
+2. **Commit the version change:**
    ```bash
    git add VERSION
-   git commit -m "chore: bump version to 1.0.3"
+   git commit -m "chore: bump version to 1.0.4"
    ```
 
-4. **Tag that commit** — the tag and the VERSION file must point at the same
-   place, so tag immediately after committing, while it is still `HEAD`:
+3. **Tag that commit** — the tag and the VERSION file must point at the same
+   place, so tag immediately after committing, while it is still `HEAD`.
+   Deriving the tag from the file makes a typo structurally impossible:
    ```bash
-   git tag -a v1.0.3 -m "Release 1.0.3"
+   git tag -a "v$(cat VERSION)" -m "Release $(cat VERSION)"
    ```
+
+4. **Run the tests:**
+   ```bash
+   go test ./...
+   ```
+
+   `TestVersionMatchesGitTag` fails if `HEAD` carries a tag that disagrees with
+   `VERSION`. It skips when git or `.git` is absent — which is exactly the case
+   inside the Docker build — so it only protects you when run from a checkout.
 
 5. **Push to origin:**
    ```bash
@@ -107,6 +125,32 @@ about what is deployed.
    `--follow-tags` pushes the branch along with any annotated tags reachable
    from it. Prefer it over `--tags`, which pushes *every* tag in the local
    repository, including ones you were not ready to publish.
+
+### Checking What Is Deployed
+
+Three ways to ask a running or built image what it contains:
+
+```bash
+docker compose run --rm app -version   # prints "1.0.3" and exits
+```
+
+`-version` is handled before the logger, config loading, and the database open,
+so it prints one bare line, works with a broken or empty environment, and never
+migrates anything. Locally: `go run ./cmd/cadence -version`.
+
+The other two are the startup log line shown above, and the version badge in the
+sidebar (and mobile drawer) of every signed-in page.
+
+### If VERSION Is Malformed
+
+`TestVersionWellFormed` asserts the file is non-empty and shaped like
+`MAJOR.MINOR.PATCH[-prerelease]`. The Dockerfile runs `go test ./...` as part of
+the image build, so a malformed VERSION **fails `docker compose up --build`**
+rather than shipping a binary with a blank or garbled version.
+
+Note that bumping VERSION invalidates the Dockerfile's `COPY . .` layer, forcing
+a full rebuild and test run. That is correct — the binary has to actually
+contain the new string.
 
 ### Fixing a Bad Tag
 

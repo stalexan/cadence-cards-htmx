@@ -219,12 +219,16 @@ not an error; a malformed line fails startup with the file and line number.
 | `ENABLE_PUBLIC_REGISTRATION` | `false` | app | When off, create users with `-create-user`. |
 | `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
 | `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |
-| `APP_VERSION` | *(empty)* | app | Informational; shown in the sidebar footer. |
 | `TZ` | `UTC` | container, app | SM-2 due dates use local-midnight day boundaries, so this decides when a card becomes due. Set it to your users' timezone. Also honoured from `.env` locally: `config.Load` runs before anything resolves `time.Local`, so a `TZ` set there still applies. |
 | `SHARED_NETWORK_NAME` | `cadence-cards-shared` | compose | External network the reverse proxy lives on. Not seen by the app. |
 
 Booleans are parsed strictly: only the literal string `true` enables them, anything else is false.
 `PORT` and `CLAUDE_MAX_TOKENS` fail startup with an error if they are set but unparseable.
+
+The version shown in the sidebar is deliberately **not** configuration: it is embedded from the
+root `VERSION` file at build time, so it cannot disagree with the binary it labels. See
+[docs/VERSIONING.md](docs/VERSIONING.md). Earlier revisions read an `APP_VERSION` variable; a
+leftover `APP_VERSION=` in an old `.env` is now ignored.
 
 The four "rarely needed" variables in `.env.example` (`PORT`, `DB_PATH`, `COOKIE_SECURE`,
 `DISABLE_RATE_LIMITING`) are not passed through by [`docker-compose.yml`](docker-compose.yml) —
@@ -271,6 +275,12 @@ With public registration off (the default), create the account from the containe
 
 ```bash
 docker compose run --rm app -create-user you@example.com
+```
+
+To check which release an image contains, without starting the server or touching the database:
+
+```bash
+docker compose run --rm app -version
 ```
 
 ### Data and backups
@@ -360,7 +370,8 @@ enough; inline variables remain handy for one-off overrides (`CLAUDE_MAX_TOKENS=
 ./cmd/cadence`).
 
 ```
-cmd/cadence/          entrypoint (+ -create-user and -backup CLI)
+VERSION               release number, embedded into the binary by version.go
+cmd/cadence/          entrypoint (+ -version, -create-user and -backup CLI)
 internal/config/      env configuration
 internal/sm2/         SM-2 algorithm (pure, with its tests)
 internal/yamlio/      YAML export/import

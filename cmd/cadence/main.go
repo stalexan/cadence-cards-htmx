@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
 
+	cadence "cadence-cards"
 	"cadence-cards/internal/claude"
 	"cadence-cards/internal/config"
 	"cadence-cards/internal/server"
@@ -26,9 +27,18 @@ import (
 )
 
 func main() {
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	createUser := flag.String("create-user", "", "create a user with the given email (prompts for password) and exit")
 	backupPath := flag.String("backup", "", `write a consistent snapshot of the database to this path ("-" for stdout) and exit`)
 	flag.Parse()
+
+	// Handled before the logger, config.Load and store.Open: asking what version
+	// a binary is must print one bare line (not a JSON log frame), must not fail
+	// on an unparseable environment, and must never migrate a database.
+	if *showVersion {
+		fmt.Println(cadence.Version)
+		return
+	}
 
 	// In "-" mode the snapshot owns stdout, so the logs — including the "loaded
 	// .env" line from config.Load below — have to go elsewhere or they corrupt
@@ -107,7 +117,7 @@ func main() {
 		httpServer.Shutdown(ctx)
 	}()
 
-	slog.Info("cadence-cards listening", "port", cfg.Port, "db", cfg.DBPath, "version", cfg.AppVersion,
+	slog.Info("cadence-cards listening", "port", cfg.Port, "db", cfg.DBPath, "version", cadence.Version,
 		"claudeConfigured", cfg.ClaudeAPIKey != "")
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal("listen", err)

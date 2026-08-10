@@ -25,8 +25,6 @@ type Config struct {
 	EnablePublicRegistration bool // ENABLE_PUBLIC_REGISTRATION
 	DisableRateLimiting      bool // DISABLE_RATE_LIMITING
 	CookieSecure             bool // COOKIE_SECURE, default true (TLS terminates at nginx)
-
-	AppVersion string // APP_VERSION, informational
 }
 
 // Load reads configuration from the environment, first exporting any variables
@@ -50,7 +48,6 @@ func Load() (Config, error) {
 		EnablePublicRegistration: os.Getenv("ENABLE_PUBLIC_REGISTRATION") == "true",
 		DisableRateLimiting:      os.Getenv("DISABLE_RATE_LIMITING") == "true",
 		CookieSecure:             true,
-		AppVersion:               os.Getenv("APP_VERSION"),
 	}
 
 	if v := os.Getenv("PORT"); v != "" {

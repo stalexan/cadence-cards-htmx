@@ -13,7 +13,6 @@ services:
       - PORT=3000
       - DB_PATH=/data/cadence.db
       - TZ=${TZ:-UTC}
-      - APP_VERSION=${APP_VERSION:-}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-5}
       - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS:-16000}

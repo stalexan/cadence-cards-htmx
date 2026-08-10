@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	cadence "cadence-cards"
 	"cadence-cards/internal/claude"
 	"cadence-cards/internal/config"
 	"cadence-cards/internal/sm2"
@@ -127,6 +128,23 @@ func (a *testApp) seed(bidir bool) store.Card {
 		a.t.Fatal(err)
 	}
 	return card
+}
+
+// The sidebar version comes from the embedded VERSION file, so it renders with
+// nothing set in the environment — newTestApp's Config never sets a version.
+// This guards against reintroducing an env-sourced version, which used to leave
+// the badge blank whenever APP_VERSION was unset.
+func TestSidebarShowsEmbeddedVersion(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("GET", "/dashboard", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("dashboard = %d", w.Code)
+	}
+	if want := "v" + cadence.Version; !strings.Contains(w.Body.String(), want) {
+		t.Errorf("dashboard body does not contain sidebar version %q", want)
+	}
 }
 
 func TestAuthLifecycle(t *testing.T) {

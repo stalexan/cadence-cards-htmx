@@ -31,7 +31,8 @@ docker compose up -d --build
 ```
 
 There is no frontend build step: `web/templates` and `web/static` are embedded
-via `go:embed` and served from the binary. Editing them requires a rebuild.
+via `go:embed` and served from the binary (as is the root `VERSION` file).
+Editing them requires a rebuild.
 
 ### Leave nothing running
 
@@ -47,8 +48,15 @@ say so. Ending a turn with something still listening is a bug.
 Request flow: **middleware chain → handler → store → SQLite**, with templates rendered server-side
 and HTMX swapping fragments.
 
+- `version.go` (repo root, `package cadence`) — embeds the root `VERSION` file as
+  `cadence.Version`, the **single source of truth** for the release number: the startup log, the
+  sidebar badge, and `-version` all read it, and nothing at runtime can override it. Keep it
+  stdlib-only — `internal/` packages import it, so any `cadence-cards/...` import here would cycle.
+  A root package is required because `go:embed` cannot reach outside its own directory, and
+  `git describe` is unavailable at build time (`.git` is `.dockerignore`d). See `docs/VERSIONING.md`.
 - `cmd/cadence/` — wiring only: config → store/migrations → server → graceful shutdown; hourly
-  maintenance ticker; `-create-user` CLI.
+  maintenance ticker; `-version`, `-create-user`, and `-backup` CLI. `-version` is handled before
+  the logger, `config.Load`, and `store.Open`, so it works with a broken env and never migrates.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
   `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports
   only keys **not already in the environment**, so the real environment always wins and a stray
