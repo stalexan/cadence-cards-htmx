@@ -82,7 +82,7 @@ and HTMX swapping fragments.
 - `internal/markdown/` — goldmark wrapper for Claude replies. Raw HTML is escaped (no
   `html.WithUnsafe`); this is the XSS boundary — do not change it.
 - `internal/server/` — handlers stay thin: parse form → store/AI call → render page or fragment.
-  `render.go` builds one cloned template set per page (layout + all partials + page) and
+  `render.go` parses one independent template set per page (layout + all partials + page) and
   a partials-only set for fragments.  `server.go` registers every route (Go 1.22+ method patterns on
   stdlib mux).
 - `web/` — `templates/layout/` (base = app shell with sidebar, auth = centered card),

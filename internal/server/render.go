@@ -113,8 +113,11 @@ var funcMap = template.FuncMap{
 	},
 }
 
-// buildTemplates parses one cloned set per page: layout + all partials + the
-// page file. The map key is the page name (file base without .html).
+// buildTemplates parses one independent set per page: layout + all partials +
+// the page file. The map key is the page name (file base without .html).
+// Each set is parsed from scratch rather than cloned from a shared base, so
+// the sets share no state: a {{define}} in one page file cannot affect another
+// page's rendering.
 func buildTemplates() (pages map[string]*template.Template, partials *template.Template, err error) {
 	partialFiles, err := fs.Glob(web.Templates, "templates/partials/*.html")
 	if err != nil {

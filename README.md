@@ -10,6 +10,9 @@ up, no NPM, no build step.
      alt="A study session: the card panel on the left with grade buttons, and Claude's chat on the
           right explaining a Spanish subjunctive answer">
 
+New to this codebase? [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) walks through how the app is
+put together, request flow, and one feature traced end to end.
+
 ## Features
 
 ### Organize your material
