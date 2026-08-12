@@ -8,8 +8,12 @@
 <p class="setup-sub">Configure your study session</p>
 
 {{/* A plain GET form: checkboxes named deckIds naturally produce repeated
-     query params, all of which the server honors. */}}
-<form method="get" action="/study/{{$d.Topic.ID}}">
+     query params, all of which the server honors. Zero deckIds params would
+     mean "no deck filter" (= every deck) to the server — the opposite of an
+     explicit "None" — so app.js blocks submitting an empty selection. */}}
+<form method="get" action="/study/{{$d.Topic.ID}}"
+      data-require-checked="deckIds"
+      data-require-checked-message="Select at least one deck to study.">
   <div class="setup-grid">
     <div class="panel">
       <div class="panel-body">

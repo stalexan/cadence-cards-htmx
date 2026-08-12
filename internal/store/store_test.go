@@ -661,3 +661,35 @@ func TestSessions(t *testing.T) {
 		t.Errorf("session after logout: got %v, want ErrNotFound", err)
 	}
 }
+
+func TestUpdateCardMoveIntoBidirectionalDeck(t *testing.T) {
+	s := newTestStore(t)
+	userID, topicID, uniDeckID := seed(t, s, false)
+	biDeck, err := s.CreateDeck(ctx, userID, DeckParams{Name: "Both ways", TopicID: topicID, IsBidirectional: true})
+	if err != nil {
+		t.Fatalf("CreateDeck: %v", err)
+	}
+
+	c := mkCard(t, s, userID, uniDeckID, "hola", sm2.PriorityA)
+	if len(c.Schedules) != 1 {
+		t.Fatalf("card in unidirectional deck: %d schedules, want 1", len(c.Schedules))
+	}
+
+	params := CardParams{DeckID: biDeck.ID, Front: c.Front, Back: c.Back, Priority: c.Priority}
+	moved, err := s.UpdateCard(ctx, userID, c.ID, c.Version, params)
+	if err != nil {
+		t.Fatalf("UpdateCard (move): %v", err)
+	}
+	if len(moved.Schedules) != 2 || moved.ReverseSchedule() == nil {
+		t.Fatalf("move into bidirectional deck must back-fill the reverse schedule; got %d schedules", len(moved.Schedules))
+	}
+
+	// A second update must not duplicate the reverse schedule.
+	again, err := s.UpdateCard(ctx, userID, c.ID, moved.Version, params)
+	if err != nil {
+		t.Fatalf("UpdateCard (repeat): %v", err)
+	}
+	if len(again.Schedules) != 2 {
+		t.Errorf("repeat update: %d schedules, want 2", len(again.Schedules))
+	}
+}

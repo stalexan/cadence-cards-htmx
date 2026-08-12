@@ -78,9 +78,11 @@ func (p studyParams) NextURL(completed int) string {
 	return "/study/" + itoa(p.TopicID) + "/next?" + p.query(completed)
 }
 
-// SessionURL is the full-page session URL (refresh-safe).
-func (p studyParams) SessionURL() string {
-	return "/study/" + itoa(p.TopicID) + "?" + p.query(p.Completed)
+// SessionURL is the full-page session URL with the given progress. The Next
+// Card/Skip buttons push it into the address bar, so a refresh restores the
+// pinned total and completed count instead of restarting the progress bar.
+func (p studyParams) SessionURL(completed int) string {
+	return "/study/" + itoa(p.TopicID) + "?" + p.query(completed)
 }
 
 // studyIndexData feeds study_index.html.

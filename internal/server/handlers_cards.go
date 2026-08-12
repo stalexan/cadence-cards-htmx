@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"cadence-cards/internal/sm2"
@@ -201,6 +202,9 @@ func (s *Server) handleCardsTableFragment(w http.ResponseWriter, r *http.Request
 		s.serverError(w, r, err)
 		return
 	}
+	// The server, not each control, decides the pushed URL: it reflects the
+	// filter state that was actually rendered, so refresh/back round-trip.
+	w.Header().Set("HX-Push-Url", table.PushURL+table.QueryString())
 	s.fragment(w, http.StatusOK, "card_table", table)
 }
 
@@ -220,6 +224,7 @@ func (s *Server) handleDeckCardsFragment(w http.ResponseWriter, r *http.Request)
 		s.serverError(w, r, err)
 		return
 	}
+	w.Header().Set("HX-Push-Url", table.PushURL+table.QueryString())
 	s.fragment(w, http.StatusOK, "card_table", table)
 }
 
@@ -392,11 +397,22 @@ func (s *Server) handleCardUpdate(w http.ResponseWriter, r *http.Request) {
 			s.storeError(w, r, err)
 			return
 		}
+		// Stay in edit mode and keep the user's typed input: the fresh card
+		// supplies the current version (so a save after a 409 succeeds), the
+		// submitted params supply the content.
+		card.Front, card.Back, card.Note, card.Tags = p.Front, p.Back, p.Note, p.Tags
+		if sm2.ValidPriority(string(p.Priority)) {
+			card.Priority = p.Priority
+		}
+		if p.DeckID != 0 {
+			card.DeckID = p.DeckID
+		}
 		data, err := s.cardFormData(r, &card, p, msg)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
 		}
+		data.Editing = true
 		data.VersionConflict = conflict
 		s.render(w, r, status, "cards_show", data)
 	}
@@ -430,9 +446,12 @@ func (s *Server) handleCardDelete(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	// Return where the delete came from (deck page or cards list).
+	// Return where the delete came from (deck page or cards list). Only
+	// same-origin paths: "//host" and "/\host" are protocol-relative
+	// redirects in browsers, so require exactly one leading slash.
 	dest := r.FormValue("redirect")
-	if dest == "" || dest[0] != '/' {
+	if dest == "" || dest[0] != '/' ||
+		strings.HasPrefix(dest, "//") || strings.HasPrefix(dest, "/\\") {
 		dest = "/cards"
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)

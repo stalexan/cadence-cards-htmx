@@ -40,14 +40,34 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		Port:                     3000,
-		DBPath:                   "/data/cadence.db",
-		ClaudeAPIKey:             os.Getenv("CLAUDE_API_KEY"),
-		ClaudeModel:              "claude-opus-5",
-		ClaudeMaxTokens:          16000,
-		EnablePublicRegistration: os.Getenv("ENABLE_PUBLIC_REGISTRATION") == "true",
-		DisableRateLimiting:      os.Getenv("DISABLE_RATE_LIMITING") == "true",
-		CookieSecure:             true,
+		Port:            3000,
+		DBPath:          "/data/cadence.db",
+		ClaudeAPIKey:    os.Getenv("CLAUDE_API_KEY"),
+		ClaudeModel:     "claude-opus-5",
+		ClaudeMaxTokens: 16000,
+		CookieSecure:    true,
+	}
+
+	// Booleans parse strictly (true/false/1/0/t/f, per strconv.ParseBool):
+	// a typo like COOKIE_SECURE="True " must fail loudly, not silently flip
+	// a security setting to its zero value.
+	for _, b := range []struct {
+		name string
+		dst  *bool
+	}{
+		{"ENABLE_PUBLIC_REGISTRATION", &cfg.EnablePublicRegistration},
+		{"DISABLE_RATE_LIMITING", &cfg.DisableRateLimiting},
+		{"COOKIE_SECURE", &cfg.CookieSecure},
+	} {
+		v := os.Getenv(b.name)
+		if v == "" {
+			continue
+		}
+		val, err := strconv.ParseBool(v)
+		if err != nil {
+			return cfg, fmt.Errorf("invalid %s %q (want true or false)", b.name, v)
+		}
+		*b.dst = val
 	}
 
 	if v := os.Getenv("PORT"); v != "" {
@@ -69,9 +89,6 @@ func Load() (Config, error) {
 			return cfg, fmt.Errorf("invalid CLAUDE_MAX_TOKENS %q", v)
 		}
 		cfg.ClaudeMaxTokens = n
-	}
-	if v := os.Getenv("COOKIE_SECURE"); v != "" {
-		cfg.CookieSecure = v == "true"
 	}
 	return cfg, nil
 }

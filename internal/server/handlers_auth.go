@@ -16,6 +16,15 @@ import (
 // bcryptCost matches password.ts (12 rounds).
 const bcryptCost = 12
 
+// bcryptMaxBytes is bcrypt's hard input limit; GenerateFromPassword errors on
+// anything longer, so the handlers must reject it as a validation failure.
+const bcryptMaxBytes = 72
+
+// dummyHash (cost 12, matching real hashes) is compared against on the
+// unknown-email login path so its response time matches the known-email path;
+// otherwise the ~250ms bcrypt gap confirms which addresses have accounts.
+const dummyHash = "$2a$12$qxcZsqF6pdR1AC1VWzi5yuyudKDqye7z.rn04iz3Fu871JIEEVMNi"
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.Ping(r.Context()); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -73,6 +82,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	user, hash, err := s.store.GetUserByEmail(r.Context(), email)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
+			// Burn the same bcrypt work as a real comparison (see dummyHash).
+			bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(password))
 			s.limiter.RecordFailedAuth(ip, email, now)
 			slog.Warn("login failed: unknown email", "email", email, "ip", ip)
 			fail("Invalid email or password.")
@@ -88,7 +99,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.limiter.ClearFailedAttempts(ip, email)
+	s.limiter.ClearFailedAttempts(email)
 	token, err := s.store.CreateSession(r.Context(), user.ID, now)
 	if err != nil {
 		s.serverError(w, r, err)
@@ -154,6 +165,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(password) < 8 {
 		fail("Password must be at least 8 characters.")
+		return
+	}
+	if len(password) > bcryptMaxBytes {
+		fail("Password must be at most 72 characters.")
 		return
 	}
 	if password != confirm {

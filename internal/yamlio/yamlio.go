@@ -193,10 +193,18 @@ func Export(cards []ExportCard, meta *Metadata, includeSM2 bool) (string, error)
 # Cards: %d
 # ============================================
 
-`, meta.FormatVersion, meta.DeckName, creator, meta.ExportDate, meta.CardCount)
+`, meta.FormatVersion, headerValue(meta.DeckName), headerValue(creator), meta.ExportDate, meta.CardCount)
 		return header + content, nil
 	}
 	return content, nil
+}
+
+// headerValue keeps a user-supplied metadata value on its own comment line: a
+// newline in a deck or creator name would otherwise escape the '# ' header
+// and inject content into the export.
+func headerValue(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	return strings.ReplaceAll(s, "\n", " ")
 }
 
 // Import parses YAML content into valid and invalid cards (port of
@@ -335,7 +343,11 @@ func decodeCard(node *yaml.Node) (Card, error) {
 		}
 		card.ReverseInterval = *raw.ReverseInterval
 	}
-	card.HasReverse = present["ReverseLastSeen"] || present["ReverseGrade"] || present["ReverseRepCount"]
+	// Any reverse key means the file carries reverse-direction state; the
+	// Easiness/Interval keys count too, or values that were just validated
+	// above would be silently discarded by ReverseState.
+	card.HasReverse = present["ReverseLastSeen"] || present["ReverseGrade"] || present["ReverseRepCount"] ||
+		present["ReverseEasiness"] || present["ReverseInterval"]
 	return card, nil
 }
 

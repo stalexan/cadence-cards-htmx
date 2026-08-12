@@ -41,15 +41,20 @@ func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	userID := userFrom(r).ID
-	r.Body = http.MaxBytesReader(w, r.Body, maxImportSize+4096)
+	// Import failures render as 422 fragments: the htmx-config in base.html
+	// swaps 422 (and 409) but discards other 4xx/5xx bodies, so any other
+	// status would leave the user with no feedback at all. The wire cap is 3×
+	// the content limit because the textarea arrives urlencoded (up to 3 bytes
+	// per byte); the decoded length check below is the real 1 MB limit.
+	r.Body = http.MaxBytesReader(w, r.Body, 3*maxImportSize+4096)
 	if err := r.ParseForm(); err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			s.fragment(w, http.StatusRequestEntityTooLarge, "import_result",
+			s.fragment(w, http.StatusUnprocessableEntity, "import_result",
 				importResultData{Message: "YAML content exceeds the 1 MB limit."})
 			return
 		}
-		s.fragment(w, http.StatusBadRequest, "import_result",
+		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
 			importResultData{Message: "Invalid form submission."})
 		return
 	}
@@ -57,25 +62,30 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	yamlContent := r.FormValue("yamlContent")
 	deckID := int64(formInt(r, "deckId", 0))
 	if yamlContent == "" || deckID == 0 {
-		s.fragment(w, http.StatusBadRequest, "import_result",
+		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
 			importResultData{Message: "YAML content and a target deck are required."})
 		return
 	}
 	if len(yamlContent) > maxImportSize {
-		s.fragment(w, http.StatusRequestEntityTooLarge, "import_result",
+		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
 			importResultData{Message: "YAML content exceeds the 1 MB limit."})
 		return
 	}
 
 	deck, err := s.store.GetDeck(r.Context(), userID, deckID)
 	if err != nil {
-		s.storeError(w, r, err)
+		if errors.Is(err, store.ErrNotFound) {
+			s.fragment(w, http.StatusUnprocessableEntity, "import_result",
+				importResultData{Message: "The selected deck no longer exists."})
+			return
+		}
+		s.serverError(w, r, err)
 		return
 	}
 
 	valid, invalid, err := yamlio.Import(yamlContent)
 	if err != nil {
-		s.fragment(w, http.StatusBadRequest, "import_result",
+		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
 			importResultData{Message: err.Error()})
 		return
 	}

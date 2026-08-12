@@ -7,7 +7,7 @@
 </div>
 
 {{if $d.VersionConflict}}
-{{template "alert" (dict "Kind" "warning" "Title" "Card was modified" "Body" "This card was modified by another request. The latest version is shown below — please re-apply your changes.")}}
+{{template "alert" (dict "Kind" "warning" "Title" "Card was modified" "Body" "This card was modified by another request while you were editing. Your edits are kept below — review them and save again to make them the latest version.")}}
 {{end}}
 {{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
 

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -105,8 +107,12 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown on SIGTERM/SIGINT.
+	// Graceful shutdown on SIGTERM/SIGINT. ListenAndServe returns the moment
+	// Shutdown *begins*, so main must wait for shutdownDone or it would exit
+	// (and close the store) while in-flight requests are still draining.
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 		<-sig
@@ -114,7 +120,9 @@ func main() {
 		stopCleanup()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		httpServer.Shutdown(ctx)
+		if err := httpServer.Shutdown(ctx); err != nil {
+			slog.Error("shutdown did not drain cleanly", "error", err)
+		}
 	}()
 
 	slog.Info("cadence-cards listening", "port", cfg.Port, "db", cfg.DBPath, "version", cadence.Version,
@@ -122,6 +130,7 @@ func main() {
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal("listen", err)
 	}
+	<-shutdownDone
 }
 
 // runBackup writes a consistent snapshot of the database at dbPath to dest.
@@ -206,18 +215,32 @@ func backupToFile(ctx context.Context, st *store.Store, dest string) error {
 
 // runCreateUser interactively creates an account (replaces the Svelte app's
 // scripts/create-user.ts; used when public registration is disabled).
+//
+// Input is read line-wise through one shared reader: fmt.Scanln would stop
+// the name at its first space and leave the rest of the line queued, where
+// the password prompt would silently consume it.
 func runCreateUser(st *store.Store, email string) error {
+	in := bufio.NewReader(os.Stdin)
+
 	fmt.Print("Name: ")
-	var name string
-	fmt.Scanln(&name)
+	name, err := readLine(in)
+	if err != nil {
+		return err
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return errors.New("name is required")
+	}
 
 	fmt.Print("Password (min 8 chars): ")
-	password, err := readPassword()
+	password, err := readPassword(in)
 	if err != nil {
 		return err
 	}
 	if len(password) < 8 {
 		return errors.New("password must be at least 8 characters")
+	}
+	if len(password) > 72 {
+		return errors.New("password must be at most 72 bytes (bcrypt limit)")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword(password, 12)
@@ -232,15 +255,27 @@ func runCreateUser(st *store.Store, email string) error {
 	return nil
 }
 
-func readPassword() ([]byte, error) {
+// readLine reads one full line, accepting an unterminated final line (EOF).
+func readLine(in *bufio.Reader) (string, error) {
+	line, err := in.ReadString('\n')
+	if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
+}
+
+func readPassword(in *bufio.Reader) ([]byte, error) {
 	fd := int(os.Stdin.Fd())
 	if term.IsTerminal(fd) {
+		// Safe alongside the bufio reader: a terminal in canonical mode hands
+		// over at most one line per read, so nothing beyond the name line is
+		// sitting in the buffer.
 		defer fmt.Println()
 		return term.ReadPassword(fd)
 	}
-	// Non-interactive fallback (piped input).
-	var pw string
-	if _, err := fmt.Scanln(&pw); err != nil {
+	// Non-interactive fallback (piped input): next line, spaces preserved.
+	pw, err := readLine(in)
+	if err != nil {
 		return nil, err
 	}
 	return []byte(pw), nil

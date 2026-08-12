@@ -329,10 +329,11 @@ func (s *Store) UpdateCard(ctx context.Context, userID, cardID int64, version in
 		}
 
 		// Verify the target deck belongs to the user (card may move decks).
+		var bidir int
 		err = tx.QueryRowContext(ctx, `
-			SELECT 1 FROM decks d
+			SELECT d.is_bidirectional FROM decks d
 			JOIN topics t ON t.id = d.topic_id
-			WHERE d.id = ? AND t.user_id = ?`, p.DeckID, userID).Scan(&one)
+			WHERE d.id = ? AND t.user_id = ?`, p.DeckID, userID).Scan(&bidir)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -352,6 +353,19 @@ func (s *Store) UpdateCard(ctx context.Context, userID, cardID int64, version in
 		if n, _ := res.RowsAffected(); n == 0 {
 			// Row exists (checked above) but version didn't match.
 			return ErrVersionConflict
+		}
+
+		// A move into a bidirectional deck must back-fill the reverse
+		// schedule, or the card is silently never offered in reverse (a
+		// pre-existing dormant one is left as is, matching UpdateDeck).
+		if bidir == 1 {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO schedules (card_id, is_reversed)
+				SELECT ?, 1
+				WHERE NOT EXISTS (SELECT 1 FROM schedules s WHERE s.card_id = ? AND s.is_reversed = 1)`,
+				cardID, cardID); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

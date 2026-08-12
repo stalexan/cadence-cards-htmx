@@ -184,11 +184,14 @@ func (l *Limiter) IsAccountLockedOut(email string, now time.Time) bool {
 	return true
 }
 
-// ClearFailedAttempts resets failure tracking after a successful login.
-func (l *Limiter) ClearFailedAttempts(ip, email string) {
+// ClearFailedAttempts resets an account's failure tracking after a successful
+// login. IP-level failures are deliberately left to expire on their own: an
+// attacker who owns one valid account on the IP must not be able to launder
+// the IP's brute-force budget against other accounts by logging in between
+// guesses.
+func (l *Limiter) ClearFailedAttempts(email string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	delete(l.ipAuthFailures, ip)
 	if email != "" {
 		delete(l.emailAuthFailures, email)
 	}

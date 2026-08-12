@@ -232,3 +232,28 @@ func TestCountDueByPriority(t *testing.T) {
 		t.Errorf("counts = (total %d, A %d, B %d, C %d), want (3, 1, 1, 1)", total, a, b, cCount)
 	}
 }
+
+// Not part of the sm2.test.ts port: the JS source floors hours/24 and skips a
+// day after spring-forward; the Go port deliberately rounds instead.
+func TestDaysBetweenAcrossDST(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("tzdata unavailable: %v", err)
+	}
+	orig := time.Local
+	time.Local = loc
+	defer func() { time.Local = orig }()
+
+	// Spring-forward 2026-03-08: the following midnights are 23h apart.
+	if got := DaysBetween(
+		time.Date(2026, 3, 8, 20, 0, 0, 0, loc),
+		time.Date(2026, 3, 9, 9, 0, 0, 0, loc)); got != 1 {
+		t.Errorf("spring-forward: DaysBetween = %d, want 1", got)
+	}
+	// Fall-back 2026-11-01: the following midnights are 25h apart.
+	if got := DaysBetween(
+		time.Date(2026, 11, 1, 20, 0, 0, 0, loc),
+		time.Date(2026, 11, 2, 9, 0, 0, 0, loc)); got != 1 {
+		t.Errorf("fall-back: DaysBetween = %d, want 1", got)
+	}
+}

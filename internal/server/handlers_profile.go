@@ -64,6 +64,10 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		fail("New password must be at least 8 characters.")
 		return
 	}
+	if len(next) > bcryptMaxBytes {
+		fail("New password must be at most 72 characters.")
+		return
+	}
 	if next != confirm {
 		fail("New passwords do not match.")
 		return

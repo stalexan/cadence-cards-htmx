@@ -412,10 +412,19 @@ func TestCardUpdateVersionConflictPage(t *testing.T) {
 	if w := app.do("POST", "/cards/1", form); w.Code != http.StatusSeeOther {
 		t.Fatalf("update = %d", w.Code)
 	}
-	// Replay with the stale version -> conflict banner page.
+	// Replay with the stale version -> conflict banner page, still in edit
+	// mode with the submitted values and the fresh version, so the user can
+	// review and save again instead of retyping.
 	w := app.do("POST", "/cards/1", form)
 	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "modified by another request") {
 		t.Errorf("stale update = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Edit Card") || !strings.Contains(body, "hola!") {
+		t.Errorf("conflict page dropped edit mode or typed input: %.300s", body)
+	}
+	if !strings.Contains(body, `name="version" value="1"`) {
+		t.Errorf("conflict page should carry the fresh version: %.300s", body)
 	}
 }
 
@@ -500,5 +509,72 @@ func TestRegistrationGate(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
 		t.Errorf("register with registration disabled = %d -> %q", w.Code, w.Header().Get("Location"))
+	}
+}
+
+// Import failures must use 422: the htmx-config swaps only 2xx/3xx, 409 and
+// 422, so any other error status renders no feedback at all.
+func TestImportErrorRendersVisibleFragment(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+
+	w := app.do("POST", "/import", url.Values{"deckId": {"1"}})
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("empty import = %d, want 422", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "required") {
+		t.Errorf("import error fragment missing message: %s", w.Body.String())
+	}
+}
+
+func TestRegisterRejectsOverlongPassword(t *testing.T) {
+	app := newTestApp(t, nil)
+	long := strings.Repeat("a", 73) // over bcrypt's 72-byte limit
+	w := app.do("POST", "/register", url.Values{
+		"name": {"T"}, "email": {"long@example.com"},
+		"password": {long}, "confirmPassword": {long},
+	})
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "at most 72") {
+		t.Errorf("overlong password register = %d, want 400 with message; body: %.200s", w.Code, w.Body.String())
+	}
+}
+
+func TestCardDeleteRejectsProtocolRelativeRedirect(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+
+	ctx := context.Background()
+	u, _, _ := app.store.GetUserByEmail(ctx, "t@example.com")
+	for _, dest := range []string{"//evil.example/phish", `/\evil.example`, "https://evil.example"} {
+		card, err := app.store.CreateCard(ctx, u.ID, store.CardParams{
+			DeckID: 1, Front: "front " + dest, Back: "back", Priority: sm2.PriorityB,
+		})
+		if err != nil {
+			t.Fatalf("CreateCard: %v", err)
+		}
+		w := app.do("POST", "/cards/"+itoa(card.ID)+"/delete", url.Values{"redirect": {dest}})
+		if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/cards" {
+			t.Errorf("redirect=%q -> %d %q, want fallback to /cards", dest, w.Code, w.Header().Get("Location"))
+		}
+	}
+}
+
+// The fragment endpoints tell the browser which URL reflects the rendered
+// filter state, so refresh/back round-trip.
+func TestCardsTableFragmentPushesFilterURL(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+
+	w := app.do("GET", "/cards/table?priority=A", nil)
+	if got := w.Header().Get("HX-Push-Url"); got != "/cards?priority=A" {
+		t.Errorf("HX-Push-Url = %q, want /cards?priority=A", got)
+	}
+
+	w = app.do("GET", "/decks/grid?q=vo", nil)
+	if got := w.Header().Get("HX-Push-Url"); got != "/decks?q=vo" {
+		t.Errorf("deck grid HX-Push-Url = %q, want /decks?q=vo", got)
 	}
 }

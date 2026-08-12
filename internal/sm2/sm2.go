@@ -69,11 +69,16 @@ func InitialState() State {
 
 // DaysBetween calculates whole days between two instants, ignoring time of
 // day, using local-midnight boundaries (port of getDaysBetweenDates).
+//
+// Rounded, not floored: across a DST transition adjacent local midnights are
+// 23 or 25 hours apart, and flooring 23h/24 to 0 made a 1-day interval skip
+// the day after spring-forward (a bug the JS source shares). DST shifts are
+// at most one hour, so rounding always lands on the calendar-day count.
 func DaysBetween(a, b time.Time) int {
 	al, bl := a.In(time.Local), b.In(time.Local)
 	d1 := time.Date(al.Year(), al.Month(), al.Day(), 0, 0, 0, 0, time.Local)
 	d2 := time.Date(bl.Year(), bl.Month(), bl.Day(), 0, 0, 0, 0, time.Local)
-	return int(math.Floor(d2.Sub(d1).Hours() / 24))
+	return int(math.Round(d2.Sub(d1).Hours() / 24))
 }
 
 // CalculateNextInterval applies one review with the given grade to the

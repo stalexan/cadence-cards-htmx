@@ -222,3 +222,24 @@ func writeTempEnv(t *testing.T, content string) string {
 	}
 	return path
 }
+
+// Boolean env vars must parse strictly: "True" and "1" work, garbage errors
+// loudly instead of silently flipping a security default.
+func TestLoadStrictBoolParsing(t *testing.T) {
+	t.Setenv("COOKIE_SECURE", "True")
+	cfg, err := Load()
+	if err != nil || !cfg.CookieSecure {
+		t.Errorf(`COOKIE_SECURE="True": cfg=%+v err=%v, want secure`, cfg.CookieSecure, err)
+	}
+
+	t.Setenv("COOKIE_SECURE", "0")
+	cfg, err = Load()
+	if err != nil || cfg.CookieSecure {
+		t.Errorf(`COOKIE_SECURE="0": cfg=%+v err=%v, want insecure`, cfg.CookieSecure, err)
+	}
+
+	t.Setenv("COOKIE_SECURE", "yes")
+	if _, err := Load(); err == nil {
+		t.Error(`COOKIE_SECURE="yes": want a load error, got nil`)
+	}
+}

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,12 @@ func (s *Server) handleDecksGridFragment(w http.ResponseWriter, r *http.Request)
 		s.serverError(w, r, err)
 		return
 	}
+	// Push the page URL for the state actually rendered (see card_table).
+	push := "/decks"
+	if grid.Query != "" {
+		push += "?q=" + url.QueryEscape(grid.Query)
+	}
+	w.Header().Set("HX-Push-Url", push)
 	s.fragment(w, http.StatusOK, "deck_grid", grid)
 }
 
@@ -258,7 +265,11 @@ func (s *Server) deckExportYAML(r *http.Request) (string, string, error) {
 		if fwd := c.ForwardSchedule(); fwd != nil {
 			ec.Forward = fwd.State()
 		}
-		if rev := c.ReverseSchedule(); rev != nil {
+		// Only for currently-bidirectional decks: a dormant reverse schedule
+		// (left behind when bidirectionality was switched off) must not leak
+		// Reverse* fields, which would flip the target deck to bidirectional
+		// on re-import.
+		if rev := c.ReverseSchedule(); rev != nil && deck.IsBidirectional {
 			st := rev.State()
 			ec.Reverse = &st
 		}

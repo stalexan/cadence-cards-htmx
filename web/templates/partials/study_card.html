@@ -46,8 +46,10 @@
       {{/* Per the parity decision the prompt lives inside the answer panel, as
            in the reference — it is not shown above the chat. */}}
       <div class="answer-section">
+        {{/* The toggle handler rewrites only [data-toggle-label], keeping the
+             icon (textContent on the button would destroy the SVG). */}}
         <button type="button" class="btn btn-secondary btn-block" data-toggle="#answer-panel"
-                data-label-show="Show Answer" data-label-hide="Hide Answer">{{template "icon-eye"}} Show Answer</button>
+                data-label-show="Show Answer" data-label-hide="Hide Answer">{{template "icon-eye"}} <span data-toggle-label>Show Answer</span></button>
         <div id="answer-panel" hidden>
           <div class="answer-panel">
             <h3>{{$item.PromptLabel}}</h3>

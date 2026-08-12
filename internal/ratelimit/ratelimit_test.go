@@ -75,9 +75,14 @@ func TestClearFailedAttempts(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		l.RecordFailedAuth("1.1.1.1", "a@b.c", t0)
 	}
-	l.ClearFailedAttempts("1.1.1.1", "a@b.c")
-	if l.IsIPLockedOut("1.1.1.1", t0) || l.IsAccountLockedOut("a@b.c", t0) {
-		t.Error("successful login should clear lockouts")
+	l.ClearFailedAttempts("a@b.c")
+	if l.IsAccountLockedOut("a@b.c", t0) {
+		t.Error("successful login should clear the account lockout")
+	}
+	// IP failures must survive a successful login: otherwise one valid
+	// account on the IP launders the brute-force budget between guesses.
+	if !l.CheckAuthAttemptRateLimit("1.1.1.1", t0) {
+		t.Error("successful login must not clear IP failure tracking")
 	}
 }
 

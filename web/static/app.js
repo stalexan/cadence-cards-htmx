@@ -14,7 +14,10 @@
     var hidden = panel.toggleAttribute("hidden");
     var show = btn.getAttribute("data-label-show") || btn.textContent;
     var hide = btn.getAttribute("data-label-hide") || btn.textContent;
-    btn.textContent = hidden ? show : hide;
+    // Rewrite the label span when present — textContent on the whole button
+    // would destroy sibling children like the eye icon SVG.
+    var label = btn.querySelector("[data-toggle-label]") || btn;
+    label.textContent = hidden ? show : hide;
   });
 
   // ----- Copy to clipboard with a 2s checkmark -----
@@ -105,7 +108,12 @@
     var opener = e.target.closest("[data-open-dialog]");
     if (opener) {
       var dlg = document.querySelector(opener.getAttribute("data-open-dialog"));
-      if (dlg) dlg.showModal();
+      if (dlg) {
+        dlg.showModal();
+        // Lets dialog content lazy-load via hx-trigger="dialog-opened ..."
+        // (the share dialog's YAML preview).
+        dlg.dispatchEvent(new Event("dialog-opened"));
+      }
       return;
     }
     var closer = e.target.closest("[data-close-dialog]");
@@ -184,6 +192,21 @@
     btn.closest("form").querySelectorAll('input[type="checkbox"][name="' + name + '"]').forEach(function (box) {
       box.checked = on;
     });
+  });
+
+  // ----- Forms that need at least one checked box (study setup decks) -----
+  // Registered after the busy-state listener so it can undo data-busy when it
+  // blocks the submit.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    var name = form.getAttribute("data-require-checked");
+    if (!name) return;
+    if (!form.querySelector('input[type="checkbox"][name="' + name + '"]:checked')) {
+      e.preventDefault();
+      delete form.dataset.busy;
+      window.alert(form.getAttribute("data-require-checked-message") || "Select at least one option.");
+    }
   });
 
   // ----- Study setup: unchecked box -> enable hidden includeNew=false -----

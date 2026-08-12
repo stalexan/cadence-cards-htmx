@@ -5,6 +5,7 @@ package claude
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -117,9 +118,13 @@ func (c *Client) generateText(ctx context.Context, system string, msgs []Message
 	}
 
 	for _, block := range resp.Content {
-		if block.Type == "text" {
+		if block.Type == "text" && block.Text != "" {
 			return block.Text, nil
 		}
 	}
-	return "", nil
+	// No text for any other reason (e.g. thinking consumed the whole
+	// max_tokens budget) must be an error, or the handlers render an empty
+	// assistant bubble and store an empty turn in the chat history.
+	slog.Warn("claude returned no text", "model", c.model, "stopReason", string(resp.StopReason))
+	return "", fmt.Errorf("claude returned no text (stop reason %q)", resp.StopReason)
 }

@@ -4,12 +4,15 @@
 {{define "deck_grid"}}
 <div id="deck-grid">
   <div class="list-search">
+    {{/* Swaps only the results (hx-select) so typing is never interrupted by
+         the response replacing this input; the address bar follows the
+         HX-Push-Url header on the fragment response. */}}
     <input class="input" type="search" name="q" placeholder="Search decks…" value="{{.Query}}"
            aria-label="Search decks"
-           hx-get="/decks/grid" hx-target="#deck-grid" hx-swap="outerHTML"
-           hx-push-url="/decks{{if .Query}}?q={{.Query}}{{end}}"
+           hx-get="/decks/grid" hx-target="#deck-grid-results" hx-select="#deck-grid-results" hx-swap="outerHTML"
            hx-trigger="input changed delay:300ms">
   </div>
+  <div id="deck-grid-results">
   {{if .Decks}}
   <div class="grid-cards">
     {{range .Decks}}
@@ -51,5 +54,6 @@
     <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} New Deck</a>
   </div>
   {{end}}
+  </div>
 </div>
 {{end}}

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"cadence-cards/internal/store"
 )
 
@@ -83,5 +85,43 @@ func TestRunBackupMissingDatabase(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope.db")
 	if err := runBackup(context.Background(), missing, "-", io.Discard); err == nil {
 		t.Fatal("runBackup on a missing database: got nil, want error")
+	}
+}
+
+// The name prompt must take the whole line and the piped password must be the
+// next line — fmt.Scanln used to split "Sean Alexandre" at the space and feed
+// the surname's tail to the password prompt.
+func TestRunCreateUserMultiWordName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "users.db")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString("Sean Alexandre\nsuper secret password\n"); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	if err := runCreateUser(st, "sean@example.com"); err != nil {
+		t.Fatalf("runCreateUser: %v", err)
+	}
+	user, hash, err := st.GetUserByEmail(context.Background(), "sean@example.com")
+	if err != nil {
+		t.Fatalf("GetUserByEmail: %v", err)
+	}
+	if user.Name == nil || *user.Name != "Sean Alexandre" {
+		t.Errorf("name = %v, want %q", user.Name, "Sean Alexandre")
+	}
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte("super secret password")) != nil {
+		t.Error("stored hash does not match the piped password")
 	}
 }

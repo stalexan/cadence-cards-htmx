@@ -14,12 +14,17 @@
         <h2 class="filters-title">{{template "icon-filter"}}Filters</h2>
         <a class="btn btn-secondary btn-sm" href="{{.PushURL}}">{{template "icon-rotate-ccw"}}Reset</a>
       </div>
+      {{/* target:select filters the bubbled change event to the selects; the
+           search input drives its own requests. The pushed URL comes from the
+           HX-Push-Url response header, which carries the filter state the
+           server actually rendered. The search input swaps only #card-results
+           (hx-select) so typing is never interrupted by its own swap. */}}
       <form class="filters-row" hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML"
-            hx-push-url="{{.PushURL}}" hx-trigger="submit, change from:find select">
+            hx-trigger="submit, change target:select">
         <div class="filter-grow">
           <label class="label" for="f-q">Search</label>
           <input class="input" id="f-q" type="search" name="q" placeholder="Search cards…" value="{{.Query.Search}}"
-                 hx-get="{{.BasePath}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}"
+                 hx-get="{{.BasePath}}" hx-target="#card-results" hx-select="#card-results" hx-swap="outerHTML"
                  hx-trigger="input changed delay:300ms" hx-include="closest form">
         </div>
         {{if not .DeckID}}
@@ -60,6 +65,7 @@
     </div>
   </div>
 
+  <div id="card-results">
   {{if .Cards}}
   <div class="panel">
     <div class="panel-header">
@@ -69,11 +75,11 @@
       <table class="table">
         <thead>
           <tr>
-            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "front"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "front"}}">Front{{if eq .Query.Sort "front"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "front"}}" hx-target="#card-table" hx-swap="outerHTML">Front{{if eq .Query.Sort "front"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
             <th>Back</th>
-            {{if not .DeckID}}<th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "deck"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "deck"}}">Deck{{if eq .Query.Sort "deck"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>{{end}}
-            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "priority"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "priority"}}">Priority{{if eq .Query.Sort "priority"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
-            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "lastSeen"}}" hx-target="#card-table" hx-swap="outerHTML" hx-push-url="{{.PushURL}}{{.SortLink "lastSeen"}}">Last seen{{if eq .Query.Sort "lastSeen"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            {{if not .DeckID}}<th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "deck"}}" hx-target="#card-table" hx-swap="outerHTML">Deck{{if eq .Query.Sort "deck"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>{{end}}
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "priority"}}" hx-target="#card-table" hx-swap="outerHTML">Priority{{if eq .Query.Sort "priority"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
+            <th><button class="th-sort" hx-get="{{.BasePath}}{{.SortLink "lastSeen"}}" hx-target="#card-table" hx-swap="outerHTML">Last seen{{if eq .Query.Sort "lastSeen"}}{{if eq .Query.Dir "desc"}}{{template "icon-arrow-down"}}{{else}}{{template "icon-arrow-up"}}{{end}}{{end}}</button></th>
             <th>Tags</th>
             <th class="th-actions">Actions</th>
           </tr>
@@ -90,7 +96,7 @@
             <td class="cell-actions">
               <div>
                 <a class="icon-action" href="/cards/{{.ID}}" title="View">{{template "icon-eye"}}</a>
-                <a class="icon-action" href="/cards/{{.ID}}" title="Edit">{{template "icon-pencil"}}</a>
+                <a class="icon-action" href="/cards/{{.ID}}?edit=1" title="Edit">{{template "icon-pencil"}}</a>
                 <form method="post" action="/cards/{{.ID}}/delete"
                       data-confirm-title="Delete Card?"
                       data-confirm="Delete this card? This cannot be undone.">
@@ -115,5 +121,6 @@
     {{else}}<a class="btn btn-primary" href="/cards/new">{{template "icon-plus"}} Add a card</a>{{end}}
   </div>
   {{end}}
+  </div>
 </div>
 {{end}}
