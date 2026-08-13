@@ -62,8 +62,9 @@ and HTMX swapping fragments.
   only keys **not already in the environment**, so the real environment always wins and a stray
   `.env` can never override compose. A missing file is fine; `.env` is `.dockerignore`d, so this is
   local-dev only.
-- `internal/sm2/` — pure SM-2 algorithm, a verbatim port of the Svelte app's `sm2.ts` **including
-  its tests**. `now` is always injected as a parameter.  Due-ness uses **local-midnight day
+- `internal/sm2/` — pure SM-2 algorithm, a port of the Svelte app's `sm2.ts` **including its
+  tests**, verbatim except that `DaysBetween` rounds instead of floors (deliberate DST fix the JS
+  source lacks). `now` is always injected as a parameter.  Due-ness uses **local-midnight day
   boundaries** (`time.Local`), so the container's `TZ` matters.
 - `internal/yamlio/` — deck export/import, **byte-compatible** with the Svelte app's npm-yaml format
   (key order, defaults, `# ...` metadata header, date-only `LastSeen` as UTC calendar date,
@@ -93,7 +94,8 @@ and HTMX swapping fragments.
 
 `users → topics → decks → cards → schedules`, all cascade-deleting downward.  A card has one
 schedule per study direction (`is_reversed`, `UNIQUE(card_id, is_reversed)`); SM-2 state lives on
-the schedule. Topics carry seven prompt-config columns consumed by `internal/claude`. Tags are
+the schedule. Topics carry six prompt-config columns consumed by `internal/claude` (plus `name`,
+the seventh `TopicConfig` field). Tags are
 a JSON array in `cards.tags` (queried with `json_each`). Timestamps are RFC3339 UTC `TEXT` with
 millisecond precision (`store.timeFormat`).
 
@@ -102,8 +104,9 @@ millisecond precision (`store.timeFormat`).
 - **Optimistic locking**: `cards.version` and `schedules.version` are compare-and-incremented (`...
   WHERE id = ? AND version = ?`); a miss returns `store.ErrVersionConflict`, which handlers map to
   **HTTP 409**. The study UI depends on the 409 flow (`grade_conflict` fragment auto-refetches the
-  card).  htmx only swaps the 409 body because `base.html` sets `responseHandling` in the
-  `htmx-config` meta tag.
+  card).  htmx swaps error bodies only for 409 and 422 (validation) because `base.html` whitelists
+  them via `responseHandling` in the `htmx-config` meta tag — other 4xx/5xx are discarded, so an
+  error fragment must ship with one of those two statuses.
 - **Authorization in the transaction**: every mutating store method takes `userID` and scopes rows
   via joins up to `topics.user_id` *inside the same transaction as the write* (ports the Svelte
   app's ATOMICITY.md discipline).  Handlers never check ownership themselves. Missing-or-not-owned

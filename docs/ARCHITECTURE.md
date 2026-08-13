@@ -58,9 +58,17 @@ name:
 - **`HX-Redirect` header** — when an HTMX request's session has expired, a normal HTTP redirect
   would just get swapped into a small fragment target as raw HTML. Instead the handler sets
   `HX-Redirect: /login`, telling HTMX to do a full browser navigation.
-- **Non-2xx swapping** — HTMX normally ignores error responses, but `base.html`'s `htmx-config`
-  meta tag opts into swapping on any status. That's what makes the optimistic-locking conflict
-  flow work (see below): the "error" response is itself useful UI.
+- **Selective error swapping** — HTMX normally ignores error responses, but `base.html`'s
+  `htmx-config` meta tag whitelists specific statuses: **409** (optimistic-locking conflicts) and
+  **422** (validation errors) swap; other 4xx/5xx deliberately don't. That's what makes the
+  conflict flow work (see below) — the "error" response is itself useful UI — but it also means an
+  error fragment returned with any *other* status is silently discarded, so error-bearing
+  fragments must use one of the whitelisted codes.
+- **`HX-Push-Url` response header** — fragment handlers, not `hx-push-url` attributes, own the
+  address bar. When a fragment response should change what a refresh or bookmark restores (card
+  filters, deck search, study progress), the handler sets `HX-Push-Url`
+  (`handlers_cards.go`, `handlers_decks.go`, and study's `SessionURL`). Per-element attributes
+  would go stale as state threads through swaps; the server always knows the canonical URL.
 
 ### Where state lives, given there's no client-side app
 
@@ -69,7 +77,8 @@ there's no in-memory client state:
 
 - **Study session progress** (selected decks, filters, how many cards completed) lives in the
   **URL query string**, re-threaded through every fragment request. The server is stateless per
-  request — refreshing or hitting back mid-session loses nothing.
+  request — and because Next/Skip push the updated session URL via `HX-Push-Url`, refreshing or
+  hitting back mid-session loses nothing.
 - **Chat history** lives in a **hidden form input** in the DOM, round-tripped on every chat POST.
 - **Everything else** (cards, decks, schedules, users) lives in SQLite, queried fresh each request.
 
@@ -177,7 +186,7 @@ snapshot instead of the current state — so changing your mind is "undo, then r
 now showing the new interval and the chosen grade highlighted. A version conflict renders
 `grade_conflict` at HTTP 409 — an out-of-band chat notice plus a self-refreshing element
 (`hx-trigger="load delay:1200ms"`) that automatically re-fetches a fresh card. This only works
-because `base.html` opted HTMX into swapping non-2xx responses.
+because `base.html`'s `htmx-config` whitelists 409 for swapping.
 
 **5. Clicking "Next Card" repeats the pattern.** `hx-get="/study/{topicId}/next?..."` re-encodes
 the entire session state (deck IDs, priority, limit, completed count) in the URL.
@@ -198,8 +207,9 @@ users → topics → decks → cards → schedules
 ```
 
 All cascade-deleting downward (`ON DELETE CASCADE`). A `topic` is both a folder of decks *and* the
-context fed into Claude prompts — it carries seven prompt-config columns (`expertise`, `focus`,
-`example`, etc., see `internal/claude/prompts.go`). A `card` has one `schedule` row **per study
+context fed into Claude prompts — it carries six prompt-config columns (`topic_description`,
+`expertise`, `focus`, `context_type`, `example`, `question`; the topic's `name` joins them as the
+seventh field of `claude.TopicConfig`, see `internal/claude/prompts.go`). A `card` has one `schedule` row **per study
 direction** (`UNIQUE(card_id, is_reversed)`); bidirectional decks track forward and reverse
 knowledge independently, since knowing "hola → hello" doesn't imply knowing "hello → hola." SM-2
 state (easiness, interval, rep count, last grade) lives entirely on the schedule, not the card.
@@ -208,7 +218,9 @@ state (easiness, interval, rep count, last grade) lives entirely on the schedule
 day boundaries* (`time.Local`), so a card due "in 3 days" becomes due at the start of that day,
 not 72 hours after the review — which is what a user studying at inconsistent hours expects. The
 consequence is that the process timezone is load-bearing: the deployed container must set `TZ` to
-the users' timezone or cards surface on the wrong day. It's also why `now` is an injected parameter
+the users' timezone or cards surface on the wrong day. (One deliberate divergence from the JS
+source: `DaysBetween` *rounds* instead of floors, so a 23-hour "day" after DST spring-forward
+still counts as one day — the Svelte app shares the flooring bug.) It's also why `now` is an injected parameter
 throughout `internal/sm2` rather than a call to `time.Now` — the day-boundary logic has to be
 testable without waiting for midnight.
 
