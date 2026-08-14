@@ -223,6 +223,8 @@ not an error; a malformed line fails startup with the file and line number.
 | `CLAUDE_MAX_TOKENS` | `16000` | app | Caps thinking **and** reply together, so leave headroom — a tight value truncates the answer. Must be ≥ 1. |
 | `CLAUDE_QUESTION_MODEL` | *(empty)* | app | Model for question generation only — a small extraction task that a cheaper/faster model (e.g. `claude-haiku-4-5`) handles fine. Empty ⇒ `CLAUDE_MODEL`. |
 | `CLAUDE_QUESTION_EFFORT` | *(empty)* | app | Effort for question generation only. Empty ⇒ `CLAUDE_EFFORT`. |
+| `DISABLE_QUESTION_PREGEN` | `false` | app | Opt out of the nightly pre-generation batch (overnight API spend). Cards then always generate questions live. |
+| `QUESTION_PREGEN_HOUR` | `3` | app | Local hour (0–23) at/after which the nightly batch runs. Local time, so `TZ` applies. |
 | `ENABLE_PUBLIC_REGISTRATION` | `false` | app | When off, create users with `-create-user`. |
 | `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
 | `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |

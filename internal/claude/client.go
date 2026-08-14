@@ -242,21 +242,28 @@ func (c *Client) generateText(ctx context.Context, opts reqOptions, system strin
 		"cacheReadInputTokens", resp.Usage.CacheReadInputTokens,
 	)
 
-	// A safety-classifier refusal is an HTTP 200 with no text block, so it has
-	// to be caught here or it renders as an empty chat bubble.
-	if resp.StopReason == anthropic.StopReasonRefusal {
-		slog.Warn("claude declined the request", "model", opts.model)
+	text, err := messageText(resp)
+	if err != nil {
+		slog.Warn("claude returned no usable text",
+			"model", opts.model, "stopReason", string(resp.StopReason), "error", err)
+		return "", err
+	}
+	return text, nil
+}
+
+// messageText returns a response's first non-empty text block. A refusal is a
+// successful HTTP response with no text block, so it has to be caught here or
+// it renders as an empty chat bubble; any other textless response (e.g.
+// thinking consumed the whole max_tokens budget) must be an error too, or the
+// handlers store an empty assistant turn.
+func messageText(msg *anthropic.Message) (string, error) {
+	if msg.StopReason == anthropic.StopReasonRefusal {
 		return "", ErrRefused
 	}
-
-	for _, block := range resp.Content {
+	for _, block := range msg.Content {
 		if block.Type == "text" && block.Text != "" {
 			return block.Text, nil
 		}
 	}
-	// No text for any other reason (e.g. thinking consumed the whole
-	// max_tokens budget) must be an error, or the handlers render an empty
-	// assistant bubble and store an empty turn in the chat history.
-	slog.Warn("claude returned no text", "model", opts.model, "stopReason", string(resp.StopReason))
-	return "", fmt.Errorf("claude returned no text (stop reason %q)", resp.StopReason)
+	return "", fmt.Errorf("claude returned no text (stop reason %q)", msg.StopReason)
 }

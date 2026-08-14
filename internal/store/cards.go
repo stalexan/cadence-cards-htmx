@@ -355,6 +355,12 @@ func (s *Store) UpdateCard(ctx context.Context, userID, cardID int64, version in
 			return ErrVersionConflict
 		}
 
+		// The edit may have changed front/back/note, so any pre-generated
+		// question built from the old content is stale.
+		if err := deleteGeneratedQuestionsForCard(ctx, tx, cardID); err != nil {
+			return err
+		}
+
 		// A move into a bidirectional deck must back-fill the reverse
 		// schedule, or the card is silently never offered in reverse (a
 		// pre-existing dormant one is left as is, matching UpdateDeck).

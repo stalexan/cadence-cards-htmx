@@ -246,7 +246,8 @@ separate `schema.sql` to read; the migrations *are* the schema.
 | `internal/server` | HTTP: routing, middleware, sessions, templates, handlers |
 | `internal/store` | All SQL; typed errors; optimistic locking; authorization scoping |
 | `internal/sm2` | The pure SM-2 algorithm — no DB, no clock (time is always an injected param) |
-| `internal/claude` | Anthropic SDK client, prompt building, the three study operations |
+| `internal/claude` | Anthropic SDK client, prompt building, the three study operations, batch question generation |
+| `internal/pregen` | Nightly job pre-generating questions for due-soon cards via the Message Batches API |
 | `internal/markdown` | Renders Claude's replies to HTML (escaped — this is the XSS boundary) |
 | `internal/yamlio` | Deck import/export, byte-compatible with the sibling Svelte app's format |
 | `internal/config` | Env var parsing (`DB_PATH`, `CLAUDE_*`, `.env` loading) |
@@ -294,7 +295,19 @@ Three tiers, matching the three kinds of code above:
 This is the architectural reason `AI` is an interface (`server.go:18`) rather than a concrete
 `*claude.Client`: it's the one dependency that would otherwise make a handler test hit the network,
 so it's the one dependency that gets inverted. `stubAI` fills it in tests. Keep new AI calls behind
-that interface or the handler tests stop being runnable offline.
+that interface or the handler tests stop being runnable offline. The one deliberate exception is
+batch pre-generation: handlers never batch, so the batch capability lives on the concrete client
+behind `internal/pregen`'s own small `BatchAI` interface (faked in its tests), wired only in
+`cmd/cadence` — the `server.AI` interface and `stubAI` stay untouched.
+
+Spaced repetition knows tonight which cards are due tomorrow, so `internal/pregen` submits a
+nightly Message Batches request (half price, separate request pool) for every schedule due within
+24 hours and stores the results in `generated_questions` — one unused question per schedule,
+consumed on serve, invalidated in the same transaction as a card edit or Reset Progress so a
+question built from stale content is never shown. `handleStudyQuestion` consumes a stored question
+first and only falls back to a live API call on a miss, so the common study path costs nothing at
+question time. The run is capped per night (skips are logged, never silent) and opt-out via
+`DISABLE_QUESTION_PREGEN`.
 
 ## Dependencies
 

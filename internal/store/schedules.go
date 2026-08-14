@@ -143,21 +143,29 @@ func (s *Store) RegradeReview(ctx context.Context, userID, scheduleID int64, gra
 // schedule-service resetProgress; version still increments). The regrade
 // snapshot is cleared too — after a reset there is no review to rewind.
 func (s *Store) ResetProgress(ctx context.Context, userID, scheduleID int64) (Schedule, error) {
-	res, err := s.db.ExecContext(ctx, `
-		UPDATE schedules SET easiness = 2.5, interval = 1, rep_count = 0, grade = NULL, last_seen = NULL,
-		       prev_easiness = NULL, prev_interval = NULL, prev_rep_count = NULL,
-		       prev_grade = NULL, prev_last_seen = NULL,
-		       version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-		WHERE id = ? AND card_id IN (
-			SELECT c.id FROM cards c
-			JOIN decks d ON d.id = c.deck_id
-			JOIN topics t ON t.id = d.topic_id
-			WHERE t.user_id = ?)`, scheduleID, userID)
+	err := s.inTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `
+			UPDATE schedules SET easiness = 2.5, interval = 1, rep_count = 0, grade = NULL, last_seen = NULL,
+			       prev_easiness = NULL, prev_interval = NULL, prev_rep_count = NULL,
+			       prev_grade = NULL, prev_last_seen = NULL,
+			       version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+			WHERE id = ? AND card_id IN (
+				SELECT c.id FROM cards c
+				JOIN decks d ON d.id = c.deck_id
+				JOIN topics t ON t.id = d.topic_id
+				WHERE t.user_id = ?)`, scheduleID, userID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		// A reset card starts over; drop any question pre-generated for it.
+		_, err = tx.ExecContext(ctx, `DELETE FROM generated_questions WHERE schedule_id = ?`, scheduleID)
+		return err
+	})
 	if err != nil {
 		return Schedule{}, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return Schedule{}, ErrNotFound
 	}
 	return s.GetSchedule(ctx, userID, scheduleID)
 }

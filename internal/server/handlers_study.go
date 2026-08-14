@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -333,28 +334,44 @@ func (s *Server) handleStudyQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	topicID, _ := pathID(r, "topicId") // already validated by studyItemFor
-	// Direction-aware: Claude sees prompt/answer as front/back.
-	card := claude.CardContent{Front: item.Prompt, Back: item.Answer, Note: item.Note}
-	question, err := s.ai.GenerateQuestion(r.Context(), cfg, card)
-	data := studyQuestionData{}
+	userID := userFrom(r).ID
+
+	// The nightly batch may already have generated this card's question;
+	// consume it and skip the live API call entirely.
+	question, pregenerated, err := s.store.TakeGeneratedQuestion(r.Context(), userID, item.ScheduleID)
 	if err != nil {
-		// Distinct copy per failure class, and the card's own prompt so the
-		// user can keep studying without the assistant (same fallback shape
-		// the Svelte UI used). No conversation row: the chat handler creates
-		// one lazily on the first successful exchange.
-		data.Question = aiErrorMessage(err) + " You can practice with the following prompt: " + item.Prompt
-		data.IsError = true
-	} else {
-		convID, cerr := s.store.CreateConversation(r.Context(), userFrom(r).ID, topicID, &item.ScheduleID,
-			[]store.ChatMessage{{Role: "assistant", Content: question}})
-		if cerr != nil {
-			s.serverError(w, r, cerr)
+		s.serverError(w, r, err)
+		return
+	}
+	if !pregenerated {
+		// Direction-aware: Claude sees prompt/answer as front/back.
+		card := claude.CardContent{Front: item.Prompt, Back: item.Answer, Note: item.Note}
+		question, err = s.ai.GenerateQuestion(r.Context(), cfg, card)
+		if err != nil {
+			// Distinct copy per failure class, and the card's own prompt so
+			// the user can keep studying without the assistant (same fallback
+			// shape the Svelte UI used). No conversation row: the chat
+			// handler creates one lazily on the first successful exchange.
+			s.fragment(w, http.StatusOK, "study_question", studyQuestionData{
+				Question: aiErrorMessage(err) + " You can practice with the following prompt: " + item.Prompt,
+				IsError:  true,
+			})
 			return
 		}
-		data.Question = question
-		data.ConversationID = convID
+	} else {
+		slog.Info("served pre-generated question", "scheduleId", item.ScheduleID)
 	}
-	s.fragment(w, http.StatusOK, "study_question", data)
+
+	convID, err := s.store.CreateConversation(r.Context(), userID, topicID, &item.ScheduleID,
+		[]store.ChatMessage{{Role: "assistant", Content: question}})
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.fragment(w, http.StatusOK, "study_question", studyQuestionData{
+		Question:       question,
+		ConversationID: convID,
+	})
 }
 
 func (s *Server) handleStudyChat(w http.ResponseWriter, r *http.Request) {

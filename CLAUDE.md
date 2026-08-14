@@ -55,7 +55,8 @@ and HTMX swapping fragments.
   A root package is required because `go:embed` cannot reach outside its own directory, and
   `git describe` is unavailable at build time (`.git` is `.dockerignore`d). See `docs/VERSIONING.md`.
 - `cmd/cadence/` — wiring only: config → store/migrations → server → graceful shutdown; hourly
-  maintenance ticker; `-version`, `-create-user`, and `-backup` CLI. `-version` is handled before
+  maintenance ticker (session/conversation cleanup, rate-limiter pruning, and the nightly question
+  pre-generation batch via `internal/pregen`); `-version`, `-create-user`, and `-backup` CLI. `-version` is handled before
   the logger, `config.Load`, and `store.Open`, so it works with a broken env and never migrates.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
   `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports
@@ -84,6 +85,11 @@ and HTMX swapping fragments.
   when adding one); question generation routes to `CLAUDE_QUESTION_MODEL`/`_EFFORT` when set; API
   failures map to typed sentinels (`ErrRateLimited`/`ErrOverloaded`/`ErrBadAuth`/`ErrRefused`)
   that `internal/server/ai_errors.go` turns into distinct error-bubble copy at HTTP 200.
+- `internal/pregen/` — nightly Message Batches job pre-generating questions for cards due within
+  24h (`generated_questions` table, consumed on serve, invalidated on card edit/reset).
+  Deliberately **not** on the `server.AI` interface — handlers never batch, so handler tests stay
+  offline; the runner is wired only in `cmd/cadence` with the concrete `*claude.Client`.
+  Config: `DISABLE_QUESTION_PREGEN`, `QUESTION_PREGEN_HOUR` (local time).
 - `internal/markdown/` — goldmark wrapper for Claude replies. Raw HTML is escaped (no
   `html.WithUnsafe`); this is the XSS boundary — do not change it.
 - `internal/server/` — handlers stay thin: parse form → store/AI call → render page or fragment.

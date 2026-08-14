@@ -29,6 +29,12 @@ type Config struct {
 	ClaudeQuestionModel  string // CLAUDE_QUESTION_MODEL
 	ClaudeQuestionEffort string // CLAUDE_QUESTION_EFFORT
 
+	// Nightly question pre-generation (Message Batches). Runs at the first
+	// hourly tick at or after QUESTION_PREGEN_HOUR local time — local because
+	// SM-2 due dates already make TZ load-bearing.
+	DisableQuestionPregen bool // DISABLE_QUESTION_PREGEN
+	QuestionPregenHour    int  // QUESTION_PREGEN_HOUR, default 3 (0-23)
+
 	EnablePublicRegistration bool // ENABLE_PUBLIC_REGISTRATION
 	DisableRateLimiting      bool // DISABLE_RATE_LIMITING
 	CookieSecure             bool // COOKIE_SECURE, default true (TLS terminates at nginx)
@@ -54,6 +60,7 @@ func Load() (Config, error) {
 		ClaudeEffort:        "high",
 		ClaudeMaxTokens:     16000,
 		ClaudeQuestionModel: os.Getenv("CLAUDE_QUESTION_MODEL"),
+		QuestionPregenHour:  3,
 		CookieSecure:        true,
 	}
 
@@ -66,6 +73,7 @@ func Load() (Config, error) {
 	}{
 		{"ENABLE_PUBLIC_REGISTRATION", &cfg.EnablePublicRegistration},
 		{"DISABLE_RATE_LIMITING", &cfg.DisableRateLimiting},
+		{"DISABLE_QUESTION_PREGEN", &cfg.DisableQuestionPregen},
 		{"COOKIE_SECURE", &cfg.CookieSecure},
 	} {
 		v := os.Getenv(b.name)
@@ -116,6 +124,13 @@ func Load() (Config, error) {
 			return cfg, fmt.Errorf("invalid CLAUDE_MAX_TOKENS %q", v)
 		}
 		cfg.ClaudeMaxTokens = n
+	}
+	if v := os.Getenv("QUESTION_PREGEN_HOUR"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > 23 {
+			return cfg, fmt.Errorf("invalid QUESTION_PREGEN_HOUR %q (want 0-23)", v)
+		}
+		cfg.QuestionPregenHour = n
 	}
 	return cfg, nil
 }

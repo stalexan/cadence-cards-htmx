@@ -24,6 +24,7 @@ import (
 	cadence "cadence-cards"
 	"cadence-cards/internal/claude"
 	"cadence-cards/internal/config"
+	"cadence-cards/internal/pregen"
 	"cadence-cards/internal/server"
 	"cadence-cards/internal/store"
 )
@@ -78,9 +79,18 @@ func main() {
 		return
 	}
 
-	srv, handler, err := server.New(cfg, st, claude.New(cfg))
+	ai := claude.New(cfg)
+	srv, handler, err := server.New(cfg, st, ai)
 	if err != nil {
 		fatal("server", err)
+	}
+
+	// Nightly question pre-generation (Message Batches), fired from the
+	// hourly ticker. Deliberately outside the server.AI interface — handlers
+	// never batch, and handler tests stay offline.
+	var pregenRunner *pregen.Runner
+	if cfg.ClaudeAPIKey != "" && !cfg.DisableQuestionPregen {
+		pregenRunner = pregen.New(st, ai, cfg.QuestionPregenHour)
 	}
 
 	httpServer := &http.Server{
@@ -107,6 +117,11 @@ func main() {
 					slog.Error("conversation cleanup failed", "error", err)
 				} else if n > 0 {
 					slog.Info("pruned stale conversations", "count", n)
+				}
+				if pregenRunner != nil {
+					// Goroutine: the batch can take an hour; shutdown cancels
+					// it via cleanupCtx. MaybeRun itself guards once-per-day.
+					go pregenRunner.MaybeRun(cleanupCtx, now)
 				}
 				srv.Cleanup(now)
 			}
