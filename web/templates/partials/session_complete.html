@@ -1,7 +1,7 @@
 {{/* Rendered by /study/{topicId}/next when the limit is reached or nothing
      is due. Context: sessionCompleteData. */}}
 {{define "session_complete"}}
-{{template "study_progress" (dict "Done" .Completed "Total" .Completed "Percent" 100 "Tone" "high")}}
+{{template "study_progress" .Progress}}
 {{/* The reference has no check icon here and stacks the CTAs vertically. */}}
 <div class="session-complete">
   <h2 class="complete-title">Study Session Complete!</h2>

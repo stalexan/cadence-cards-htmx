@@ -59,6 +59,21 @@ func (s *Server) handleChatIndex(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "chat_index", topics)
 }
 
+// chatComposerData feeds the shared chat_composer partial. ScheduleID 0 =
+// topic chat (no hidden schedule input).
+type chatComposerData struct {
+	PostURL        string
+	Placeholder    string
+	ConversationID int64
+	ScheduleID     int64
+}
+
+// chatShowData feeds chat_show.html.
+type chatShowData struct {
+	Topic    store.Topic
+	Composer chatComposerData
+}
+
 func (s *Server) handleChatShow(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "topicId")
 	if !ok {
@@ -70,7 +85,13 @@ func (s *Server) handleChatShow(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, "chat_show", topic)
+	s.render(w, r, http.StatusOK, "chat_show", chatShowData{
+		Topic: topic,
+		Composer: chatComposerData{
+			PostURL:     "/chat/" + itoa(id) + "/message",
+			Placeholder: "Ask about " + topic.Name + "…",
+		},
+	})
 }
 
 // chatExchangeData feeds the chat_messages.html fragment: the user's bubble,

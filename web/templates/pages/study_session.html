@@ -4,7 +4,7 @@
 {{$p := $d.Params}}
 <div class="session-head">
   <a class="back-link" href="/study/{{$d.Topic.ID}}/setup">{{template "icon-arrow-left"}}{{$d.Topic.Name}}</a>
-  {{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total) "Tone" (progressTone $p.Completed $p.Total))}}
+  {{template "study_progress" $d.Progress}}
 </div>
 
 {{/* ResumeURL carries the current card's scheduleId (when the page URL has

@@ -20,7 +20,7 @@
     <input type="hidden" name="topicId" value="{{$p.TopicID}}">
     <input type="hidden" name="version" value="{{.Version}}">
     {{if .Graded}}<input type="hidden" name="regrade" value="1">{{end}}
-    {{template "study_params_hidden" (dict "Params" $p "Completed" $p.Completed)}}
+    {{template "study_params_hidden" $p}}
     <button type="submit" name="grade" value="CORRECT_PERFECT_RECALL"
             class="grade-btn{{if eq .Grade "CORRECT_PERFECT_RECALL"}} grade-on-green{{end}}">
       {{template "icon-check-circle"}}Perfect Recall<span class="grade-hint">(I knew it immediately)</span>

@@ -149,8 +149,10 @@ millisecond precision (`store.timeFormat`).
   auto-discovered; login/register are the only pages using the auth layout), add the handler in the
   matching `handlers_*.go`, register the route in `server.go`. Fragments go in `templates/partials/`
   and are rendered with `s.fragment(w, status, "name", data)`.
-- Template helpers live in the `funcMap` in `render.go` (`dict`, `deref`, `formatDatePtr`, `json`,
-  `markdown`, `progressPercent`, ...). Prefer adding a helper over pushing logic into templates.
+- Template helpers live in the `funcMap` in `render.go` (`dict`, `deref`, `formatDatePtr`,
+  `markdown`, ...). Prefer a typed data struct built in the handler over `dict` for any partial
+  rendered from Go code (they execute against zero values in `render_test.go`), and a funcMap
+  helper over pushing logic into templates.
 - Structured logging via `log/slog` (JSON in production); never `fmt.Println` in server code. Auth
   events log with IP/email; the request logger adds request IDs and durations.
 - Store methods return the typed errors (`ErrNotFound`, `ErrVersionConflict`, `ErrDuplicate`);

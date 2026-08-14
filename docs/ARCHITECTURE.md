@@ -330,6 +330,9 @@ the Go side, not just the frontend.
 - [`CLAUDE.md`](../CLAUDE.md) — conventions, commands, load-bearing invariants (optimistic
   locking, CSP, client-IP trust) in reference form.
 - [`VERSIONING.md`](VERSIONING.md) — how the release number is embedded and bumped.
+- [`FUTURE_WORK.md`](FUTURE_WORK.md) — considered-and-deferred work (job queue, SSE streaming,
+  SQL due-ness, reader pool) with the triggers that would make each worth building, and what was
+  rejected outright (Redis, per-user quotas) and why.
 - `internal/server/handlers_study.go` + `web/templates/partials/study_card.html`,
   `grade_area.html` — the fullest example of the request/fragment/OOB-swap pattern in one place.
 - `internal/sm2/sm2.go` — short, pure, and worth reading end to end; it's the algorithm the whole

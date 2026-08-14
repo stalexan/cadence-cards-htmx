@@ -171,8 +171,9 @@ func (s *Server) handleStudySetup(w http.ResponseWriter, r *http.Request) {
 
 // studySessionData feeds the study_session.html shell.
 type studySessionData struct {
-	Topic  store.Topic
-	Params studyParams
+	Topic    store.Topic
+	Params   studyParams
+	Progress progressData
 }
 
 func (s *Server) handleStudySession(w http.ResponseWriter, r *http.Request) {
@@ -200,29 +201,57 @@ func (s *Server) handleStudySession(w http.ResponseWriter, r *http.Request) {
 			p.Total = p.Limit
 		}
 	}
-	s.render(w, r, http.StatusOK, "study_session", studySessionData{Topic: topic, Params: p})
+	s.render(w, r, http.StatusOK, "study_session", studySessionData{
+		Topic:    topic,
+		Params:   p,
+		Progress: newProgressData(p.Completed, p.Total),
+	})
 }
 
-// studyCardData feeds the study_card.html fragment. ConversationID and
-// Messages restore an existing chat when the same card is re-served after a
-// refresh; both are zero for a freshly picked card.
+// studyCardData feeds the study_card.html fragment. Messages restores an
+// existing chat when the same card is re-served after a refresh; it is empty
+// for a freshly picked card. All nested partial data (progress bar, grade
+// area, composer) is typed and built here rather than assembled with dict in
+// the template.
 type studyCardData struct {
-	Item           store.StudyItem
-	Params         studyParams
-	ConversationID int64
-	Messages       []store.ChatMessage
+	Item      store.StudyItem
+	Params    studyParams
+	Messages  []store.ChatMessage
+	Progress  progressData
+	GradeArea gradeAreaData
+	Composer  chatComposerData
 }
 
 // sessionCompleteData feeds session_complete.html.
 type sessionCompleteData struct {
 	Completed int
 	TopicID   int64
+	Progress  progressData
 }
 
-// progressData feeds the OOB progress-bar update.
+// progressData feeds the study_progress partial (the OOB progress-bar update).
 type progressData struct {
-	Done  int
-	Total int
+	Done    int
+	Total   int
+	Percent int
+	// Tone picks the fill class; the reference deepens the indigo as the
+	// session advances, and the CSP forbids an inline style, so the band is
+	// chosen server-side and applied as a class.
+	Tone string
+}
+
+func newProgressData(done, total int) progressData {
+	p := progressData{Done: done, Total: total, Tone: "low"}
+	if total > 0 {
+		p.Percent = min(100, done*100/total)
+		switch {
+		case p.Percent >= 66:
+			p.Tone = "high"
+		case p.Percent >= 33:
+			p.Tone = "mid"
+		}
+	}
+	return p
 }
 
 func (s *Server) handleStudyNext(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +267,12 @@ func (s *Server) handleStudyNext(w http.ResponseWriter, r *http.Request) {
 	complete := func() {
 		p.ScheduleID = 0
 		w.Header().Set("HX-Push-Url", p.SessionURL(p.Completed))
-		s.fragment(w, http.StatusOK, "session_complete", sessionCompleteData{Completed: p.Completed, TopicID: topicID})
+		s.fragment(w, http.StatusOK, "session_complete", sessionCompleteData{
+			Completed: p.Completed,
+			TopicID:   topicID,
+			// Always a full bar — the session is done regardless of counts.
+			Progress: progressData{Done: p.Completed, Total: p.Completed, Percent: 100, Tone: "high"},
+		})
 	}
 	// Card-limit reached -> session complete.
 	if p.Limit > 0 && p.Completed >= p.Limit {
@@ -265,8 +299,8 @@ func (s *Server) handleStudyNext(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			data.Item = resumed
-			data.ConversationID = conv.ID
 			data.Messages = msgs
+			data.Composer.ConversationID = conv.ID
 		}
 	}
 	if data.Item.ScheduleID == 0 {
@@ -285,6 +319,11 @@ func (s *Server) handleStudyNext(w http.ResponseWriter, r *http.Request) {
 
 	p.ScheduleID = data.Item.ScheduleID
 	data.Params = p
+	data.Progress = newProgressData(p.Completed, p.Total)
+	data.GradeArea = gradeAreaData{ScheduleID: data.Item.ScheduleID, Version: data.Item.Version, Params: p}
+	data.Composer.PostURL = "/study/" + itoa(topicID) + "/chat"
+	data.Composer.Placeholder = "Type your answer…"
+	data.Composer.ScheduleID = data.Item.ScheduleID
 	w.Header().Set("HX-Push-Url", p.SessionURL(p.Completed))
 	s.fragment(w, http.StatusOK, "study_card", data)
 }

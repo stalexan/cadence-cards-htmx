@@ -1,0 +1,17 @@
+{{/* Shared chat composer for the study chat and the topic chat.
+     Context: chatComposerData{PostURL, Placeholder, ConversationID,
+     ScheduleID} — ScheduleID 0 (topic chat) omits the schedule input. */}}
+{{define "chat_composer"}}
+<div class="chat-composer">
+  <form class="chat-form" hx-post="{{.PostURL}}"
+        hx-target="#chat-messages" hx-swap="beforeend"
+        hx-disabled-elt="find button" hx-indicator="#chat-spinner"
+        data-chat-form>
+    {{if .ScheduleID}}<input type="hidden" name="scheduleId" value="{{.ScheduleID}}">{{end}}
+    <input type="hidden" id="chat-conversation" name="conversationId" value="{{.ConversationID}}">
+    <textarea class="chat-input" name="message" rows="1" placeholder="{{.Placeholder}}" data-autoresize required></textarea>
+    <button type="submit" class="chat-send" aria-label="Send">{{template "icon-send"}}</button>
+    <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </form>
+</div>
+{{end}}

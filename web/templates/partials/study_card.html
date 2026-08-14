@@ -4,6 +4,7 @@
      transcript is rendered instead of the pending-question stub. */}}
 
 {{define "study_progress"}}
+{{/* Context: progressData (Percent/Tone computed server-side). */}}
 <div id="study-progress" class="progress" hx-swap-oob="true">
   <div class="progress-head">
     <span class="progress-label">Progress</span>
@@ -18,20 +19,19 @@
 {{end}}
 
 {{define "study_params_hidden"}}
-{{/* Hidden session-parameter inputs. Context: dict "Params" p "Completed" n */}}
-{{$p := .Params}}
-{{range $p.DeckIDs}}<input type="hidden" name="deckIds" value="{{.}}">{{end}}
-{{if $p.Priority}}<input type="hidden" name="priority" value="{{$p.Priority}}">{{end}}
-{{if not $p.IncludeNew}}<input type="hidden" name="includeNew" value="false">{{end}}
-{{if gt $p.Limit 0}}<input type="hidden" name="limit" value="{{$p.Limit}}">{{end}}
-<input type="hidden" name="total" value="{{$p.Total}}">
+{{/* Hidden session-parameter inputs. Context: studyParams. */}}
+{{range .DeckIDs}}<input type="hidden" name="deckIds" value="{{.}}">{{end}}
+{{if .Priority}}<input type="hidden" name="priority" value="{{.Priority}}">{{end}}
+{{if not .IncludeNew}}<input type="hidden" name="includeNew" value="false">{{end}}
+{{if gt .Limit 0}}<input type="hidden" name="limit" value="{{.Limit}}">{{end}}
+<input type="hidden" name="total" value="{{.Total}}">
 <input type="hidden" name="completed" value="{{.Completed}}">
 {{end}}
 
 {{define "study_card"}}
 {{$item := .Item}}
 {{$p := .Params}}
-{{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total) "Tone" (progressTone $p.Completed $p.Total))}}
+{{template "study_progress" .Progress}}
 
 {{/* Two columns like the reference: card info + grading on the left, the
      Claude conversation on the right. */}}
@@ -77,7 +77,7 @@
         </div>
       </div>
 
-      {{template "grade_area" (dict "ScheduleID" $item.ScheduleID "Version" $item.Version "Params" $p "Graded" false "Grade" "" "NewInterval" 0)}}
+      {{template "grade_area" .GradeArea}}
     </div>
   </div>
 
@@ -102,18 +102,7 @@
           {{end}}
         </div>
       </div>
-      <div class="chat-composer">
-        <form class="chat-form" hx-post="/study/{{$p.TopicID}}/chat"
-              hx-target="#chat-messages" hx-swap="beforeend"
-              hx-disabled-elt="find button" hx-indicator="#chat-spinner"
-              data-chat-form>
-          <input type="hidden" name="scheduleId" value="{{$item.ScheduleID}}">
-          <input type="hidden" id="chat-conversation" name="conversationId" value="{{.ConversationID}}">
-          <textarea class="chat-input" name="message" rows="1" placeholder="Type your answer…" data-autoresize required></textarea>
-          <button type="submit" class="chat-send" aria-label="Send">{{template "icon-send"}}</button>
-          <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
-        </form>
-      </div>
+      {{template "chat_composer" .Composer}}
     </div>
   </div>
 </div>

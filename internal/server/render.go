@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -46,11 +45,6 @@ var funcMap = template.FuncMap{
 		}
 		return t.In(time.Local).Format("Jan 2, 2006")
 	},
-	// json serializes a value for hidden inputs (chat history) and hx-vals.
-	"json": func(v any) (string, error) {
-		b, err := json.Marshal(v)
-		return string(b), err
-	},
 	"markdown": markdown.Render,
 	"add":      func(a, b int) int { return a + b },
 	"sub":      func(a, b int) int { return a - b },
@@ -68,28 +62,6 @@ var funcMap = template.FuncMap{
 			return 0
 		}
 		return *p
-	},
-	"progressPercent": func(done, total int) int {
-		if total <= 0 {
-			return 0
-		}
-		return min(100, done*100/total)
-	},
-	// progressTone picks the progress bar's fill class. The reference deepens
-	// the indigo as the session advances; the CSP forbids an inline style, so
-	// the band is chosen here and applied as a class.
-	"progressTone": func(done, total int) string {
-		if total <= 0 {
-			return "low"
-		}
-		switch p := min(100, done*100/total); {
-		case p < 33:
-			return "low"
-		case p < 66:
-			return "mid"
-		default:
-			return "high"
-		}
 	},
 	"percent": func(part, whole int) int {
 		if whole <= 0 {
