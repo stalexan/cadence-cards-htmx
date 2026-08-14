@@ -79,7 +79,11 @@ and HTMX swapping fragments.
 - `internal/claude/` — `anthropic-sdk-go` client (`client.go`), prompt builders ported verbatim from
   `prompts/study-assistance.ts` (`prompts.go`), and the three operations (`study.go`):
   GenerateQuestion (extracts `<question>` tag), ChatAboutQuestion, ChatAboutTopic. Card content is
-  always fetched **server-side by scheduleId** — the browser never supplies prompt text.
+  always fetched **server-side by scheduleId** — the browser never supplies prompt text. Prompts
+  carry `cache_control` breakpoints at stable-prefix boundaries (max 4 per request — count them
+  when adding one); question generation routes to `CLAUDE_QUESTION_MODEL`/`_EFFORT` when set; API
+  failures map to typed sentinels (`ErrRateLimited`/`ErrOverloaded`/`ErrBadAuth`/`ErrRefused`)
+  that `internal/server/ai_errors.go` turns into distinct error-bubble copy at HTTP 200.
 - `internal/markdown/` — goldmark wrapper for Claude replies. Raw HTML is escaped (no
   `html.WithUnsafe`); this is the XSS boundary — do not change it.
 - `internal/server/` — handlers stay thin: parse form → store/AI call → render page or fragment.

@@ -96,8 +96,8 @@ func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
 	data := chatExchangeData{UserMessage: message}
 	if err != nil {
 		// Keep the conversation alive with an error bubble (matches the
-		// Svelte chat's failure handling).
-		data.Assistant = "Sorry, something went wrong while contacting Claude. Please try again."
+		// Svelte chat's failure handling), with distinct copy per failure class.
+		data.Assistant = aiErrorMessage(err)
 		data.IsError = true
 		data.HistoryJSON = historyJSON(history)
 	} else {

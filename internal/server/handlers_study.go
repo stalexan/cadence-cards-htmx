@@ -269,8 +269,10 @@ func (s *Server) handleStudyQuestion(w http.ResponseWriter, r *http.Request) {
 	question, err := s.ai.GenerateQuestion(r.Context(), cfg, card)
 	data := studyQuestionData{}
 	if err != nil {
-		// Same fallback the Svelte UI showed on generation failure.
-		data.Question = "Error generating question. Please try with the following prompt: " + item.Prompt
+		// Distinct copy per failure class, and the card's own prompt so the
+		// user can keep studying without the assistant (same fallback shape
+		// the Svelte UI used).
+		data.Question = aiErrorMessage(err) + " You can practice with the following prompt: " + item.Prompt
 		data.IsError = true
 		data.HistoryJSON = "[]"
 	} else {
@@ -296,7 +298,7 @@ func (s *Server) handleStudyChat(w http.ResponseWriter, r *http.Request) {
 	reply, err := s.ai.ChatAboutQuestion(r.Context(), cfg, card, answer, history)
 	data := chatExchangeData{UserMessage: answer}
 	if err != nil {
-		data.Assistant = "Sorry, something went wrong while contacting Claude. Please try again."
+		data.Assistant = aiErrorMessage(err)
 		data.IsError = true
 		data.HistoryJSON = historyJSON(history)
 	} else {

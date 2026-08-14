@@ -252,7 +252,14 @@ models:
 - **`server.Server`** — wraps `Store`, the `AI` interface, the rate limiter, and parsed templates;
   every HTTP handler is a method on it.
 - **`claude.Client`** — wraps the Anthropic SDK; implements the `server.AI` interface, which is
-  what lets handler tests substitute a stub instead of calling the real API.
+  what lets handler tests substitute a stub instead of calling the real API. Prompts carry
+  `cache_control` breakpoints at their stable-prefix boundaries (topic instructions, card block,
+  conversation history), so repeated requests in a study session hit Anthropic's prompt cache —
+  the `claude request` log line's `cacheReadInputTokens` shows when they do. Question generation
+  can run on a cheaper model/effort than the tutoring chat (`CLAUDE_QUESTION_MODEL` /
+  `CLAUDE_QUESTION_EFFORT`), and API failures are classified into typed sentinels
+  (`ErrRateLimited`, `ErrOverloaded`, `ErrBadAuth`, `ErrRefused`) that handlers map to distinct
+  error-bubble copy — studying and grading never depend on AI availability.
 - **`sm2.State`** — pure data (no methods beyond `IsDue`/`NextDueDate`); passed by value through
   the pure `CalculateNextInterval` function.
 
