@@ -98,7 +98,9 @@ and HTMX swapping fragments.
 
 `users → topics → decks → cards → schedules`, all cascade-deleting downward.  A card has one
 schedule per study direction (`is_reversed`, `UNIQUE(card_id, is_reversed)`); SM-2 state lives on
-the schedule. Topics carry six prompt-config columns consumed by `internal/claude` (plus `name`,
+the schedule. Chat transcripts live in `conversations` (owned by a topic, optionally tied to a
+schedule; both cascade) with their `chat_messages`, pruned after `store.ConversationTTL` by the
+hourly ticker. Topics carry six prompt-config columns consumed by `internal/claude` (plus `name`,
 the seventh `TopicConfig` field). Tags are
 a JSON array in `cards.tags` (queried with `json_each`). Timestamps are RFC3339 UTC `TEXT` with
 millisecond precision (`store.timeFormat`).
@@ -121,10 +123,13 @@ millisecond precision (`store.timeFormat`).
   `allowEval:false`. All client behavior is declarative htmx attributes or delegated `data-*`
   listeners in `app.js` (re-initialized on `htmx:afterSwap`).
 - **Study session state lives in the query string** (`deckIds` repeated, `priority`, `includeNew`,
-  `limit`, `total`, `completed`) — the server is stateless and sessions survive refresh. Always read
-  repeated params with `r.URL.Query()["deckIds"]` / `r.Form["deckIds"]`; reading only the first
-  value was a bug in the Svelte app that this rewrite deliberately fixes (along with honoring
-  `priority`/`includeNew`/`limit`).
+  `limit`, `total`, `completed`, plus the current card's `scheduleId`, pushed by `handleStudyNext`
+  via the `HX-Push-Url` header) — the server is stateless and a refresh re-serves the same card.
+  Always read repeated params with `url.Values["deckIds"]` (one parser covers query and form);
+  reading only the first value was a bug in the Svelte app that this rewrite deliberately fixes
+  (along with honoring `priority`/`includeNew`/`limit`). Chat transcripts are the exception: they
+  live server-side in `conversations`/`chat_messages`, and the DOM carries only the conversation
+  ID — never replay browser-supplied history to Claude.
 - **Client IP**: trust the nginx-set `X-Real-IP` header only; everything else is spoofable. CSRF
   protection is SameSite=Lax cookies + the `Sec-Fetch-Site`/Origin check middleware on non-GET
   requests.

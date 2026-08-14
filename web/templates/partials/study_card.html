@@ -1,5 +1,7 @@
 {{/* One study card: swapped into #study-area by GET /study/{topicId}/next.
-     Context: studyCardData{Item, Params, HistoryJSON}. */}}
+     Context: studyCardData{Item, Params, ConversationID, Messages}. Messages
+     is non-empty when the same card is re-served after a refresh — the stored
+     transcript is rendered instead of the pending-question stub. */}}
 
 {{define "study_progress"}}
 <div id="study-progress" class="progress" hx-swap-oob="true">
@@ -64,12 +66,12 @@
               <p>{{.}}</p>
             </div>
             {{end}}
-            {{/* Inside the panel so it only appears with the answer. New tab on
-                 purpose: the session lives in the query string and the chat
-                 history only in this DOM, so navigating away would lose both. */}}
+            {{/* Inside the panel so it only appears with the answer. A normal
+                 same-tab link: the session (including the current card) lives
+                 in the URL and the transcript in the database, so navigating
+                 away and back loses nothing. */}}
             <div class="answer-sep">
-              <a class="link-indigo" href="/cards/{{$item.CardID}}" target="_blank"
-                 rel="noopener">View Card Details{{template "icon-external-link"}}</a>
+              <a class="link-indigo" href="/cards/{{$item.CardID}}">View Card Details</a>
             </div>
           </div>
         </div>
@@ -83,6 +85,12 @@
     <div class="chat-panel chat-grow">
       <div class="chat-scroll">
         <div id="chat-messages" class="chat-inner">
+          {{if .Messages}}
+          {{/* Resumed card: replay the stored transcript, no new AI call. */}}
+          {{range .Messages}}
+          {{if eq .Role "user"}}{{template "chat_bubble_user" .Content}}{{else}}{{template "chat_bubble_assistant" (dict "Text" .Content "IsError" false)}}{{end}}
+          {{end}}
+          {{else}}
           {{/* Pending stub: fires on load, server generates the question and the
                response replaces this element (outerHTML). */}}
           <div class="chat-msg chat-assistant chat-pending"
@@ -91,6 +99,7 @@
                hx-trigger="load" hx-swap="outerHTML">
             <div class="chat-bubble"><span class="typing-dots"><i></i><i></i><i></i></span> Claude is preparing a question…</div>
           </div>
+          {{end}}
         </div>
       </div>
       <div class="chat-composer">
@@ -99,7 +108,7 @@
               hx-disabled-elt="find button" hx-indicator="#chat-spinner"
               data-chat-form>
           <input type="hidden" name="scheduleId" value="{{$item.ScheduleID}}">
-          <input type="hidden" id="chat-history" name="history" value="{{.HistoryJSON}}">
+          <input type="hidden" id="chat-conversation" name="conversationId" value="{{.ConversationID}}">
           <textarea class="chat-input" name="message" rows="1" placeholder="Type your answer…" data-autoresize required></textarea>
           <button type="submit" class="chat-send" aria-label="Send">{{template "icon-send"}}</button>
           <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>

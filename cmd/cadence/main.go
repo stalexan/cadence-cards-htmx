@@ -89,7 +89,8 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	// Hourly maintenance: expired sessions + rate-limiter entries.
+	// Hourly maintenance: expired sessions, stale chat transcripts, and
+	// rate-limiter entries.
 	cleanupCtx, stopCleanup := context.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(time.Hour)
@@ -101,6 +102,11 @@ func main() {
 			case now := <-ticker.C:
 				if err := st.DeleteExpiredSessions(cleanupCtx, now); err != nil {
 					slog.Error("session cleanup failed", "error", err)
+				}
+				if n, err := st.DeleteStaleConversations(cleanupCtx, now.Add(-store.ConversationTTL)); err != nil {
+					slog.Error("conversation cleanup failed", "error", err)
+				} else if n > 0 {
+					slog.Info("pruned stale conversations", "count", n)
 				}
 				srv.Cleanup(now)
 			}

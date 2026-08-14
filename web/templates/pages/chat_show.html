@@ -22,7 +22,7 @@
               hx-target="#chat-messages" hx-swap="beforeend"
               hx-disabled-elt="find button" hx-indicator="#chat-spinner"
               data-chat-form>
-          <input type="hidden" id="chat-history" name="history" value="[]">
+          <input type="hidden" id="chat-conversation" name="conversationId" value="0">
           <textarea class="chat-input" name="message" rows="1" placeholder="Ask about {{$topic.Name}}…" data-autoresize required></textarea>
           <button type="submit" class="chat-send" aria-label="Send">{{template "icon-send"}}</button>
           <span id="chat-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>

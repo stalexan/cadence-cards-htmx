@@ -66,20 +66,27 @@ name:
   fragments must use one of the whitelisted codes.
 - **`HX-Push-Url` response header** — fragment handlers, not `hx-push-url` attributes, own the
   address bar. When a fragment response should change what a refresh or bookmark restores (card
-  filters, deck search, study progress), the handler sets `HX-Push-Url`
-  (`handlers_cards.go`, `handlers_decks.go`, and study's `SessionURL`). Per-element attributes
-  would go stale as state threads through swaps; the server always knows the canonical URL.
+  filters, deck search, study progress and the current card), the handler sets `HX-Push-Url`
+  (`handlers_cards.go`, `handlers_decks.go`, and `handleStudyNext`, which pushes `SessionURL`
+  including the `scheduleId` of whichever card it just picked). Per-element attributes would go
+  stale as state threads through swaps — and couldn't know a server-chosen card at all; the
+  server always knows the canonical URL.
 
 ### Where state lives, given there's no client-side app
 
 Anything that needs to survive a swap or a page refresh has to live somewhere durable, since
 there's no in-memory client state:
 
-- **Study session progress** (selected decks, filters, how many cards completed) lives in the
-  **URL query string**, re-threaded through every fragment request. The server is stateless per
-  request — and because Next/Skip push the updated session URL via `HX-Push-Url`, refreshing or
-  hitting back mid-session loses nothing.
-- **Chat history** lives in a **hidden form input** in the DOM, round-tripped on every chat POST.
+- **Study session progress** (selected decks, filters, how many cards completed, and the current
+  card's `scheduleId`) lives in the **URL query string**, re-threaded through every fragment
+  request. The server is stateless per request — and because `/next` responses push the updated
+  session URL via `HX-Push-Url`, refreshing or hitting back mid-session re-serves the same card
+  with its transcript instead of burning a fresh Claude call on a random one.
+- **Chat transcripts** live in **SQLite** (`conversations`/`chat_messages`, keyed by a
+  server-issued conversation ID that is the only chat state in the DOM). The server owns the
+  history replayed to Claude, so it can't be forged client-side, request bodies don't grow with
+  turn count, and a mid-card refresh restores the conversation. Untouched conversations are
+  pruned by the hourly maintenance ticker after `store.ConversationTTL`.
 - **Everything else** (cards, decks, schedules, users) lives in SQLite, queried fresh each request.
 
 ### Why this shape fits the project's constraints
@@ -189,13 +196,16 @@ now showing the new interval and the chosen grade highlighted. A version conflic
 because `base.html`'s `htmx-config` whitelists 409 for swapping.
 
 **5. Clicking "Next Card" repeats the pattern.** `hx-get="/study/{topicId}/next?..."` re-encodes
-the entire session state (deck IDs, priority, limit, completed count) in the URL.
-`handleStudyNext` calls `store.NextDue`, which walks priority tiers A → B → C and picks randomly
-within the first non-empty tier — unless the session pinned a single `priority`, in which case that
-tier is the only one queried. The response fragment (`study_card`) does three things in one
-payload: an out-of-band progress-bar update, the new card's content and grade buttons, and a
-pending chat bubble with `hx-trigger="load"` that immediately fires the request to generate
-Claude's question for the new card.
+the entire session state (deck IDs, priority, limit, completed count) in the URL — deliberately
+without a `scheduleId`, so a fresh card is picked. `handleStudyNext` calls `store.NextDue`, which
+walks priority tiers A → B → C and picks randomly within the first non-empty tier — unless the
+session pinned a single `priority`, in which case that tier is the only one queried. The handler
+then pushes the session URL *with* the chosen card's `scheduleId` via `HX-Push-Url`, which is what
+makes a mid-card refresh (whose initial loader uses `ResumeURL`) re-serve the same card and its
+stored transcript. The response fragment (`study_card`) does three things in one payload: an
+out-of-band progress-bar update, the new card's content and grade buttons, and a pending chat
+bubble with `hx-trigger="load"` that immediately fires the request to generate Claude's question
+for the new card (skipped on resume — the stored transcript renders instead).
 
 Reading `internal/server/handlers_study.go` end to end alongside `web/templates/partials/study_card.html`
 and `grade_area.html` is the fastest way to see the full pattern in one sitting.

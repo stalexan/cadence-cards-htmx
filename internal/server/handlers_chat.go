@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"cadence-cards/internal/claude"
@@ -19,25 +18,36 @@ func (s *Server) topicConfig(r *http.Request, topicID int64) (store.Topic, claud
 	return topic, cfg, nil
 }
 
-// parseHistory decodes the hidden chat-history input (a JSON transcript).
-func parseHistory(raw string) []claude.Message {
-	var msgs []claude.Message
-	if raw != "" {
-		_ = json.Unmarshal([]byte(raw), &msgs)
-	}
-	// Drop anything malformed.
-	valid := msgs[:0]
+// toClaudeMessages converts a stored transcript into the AI call's history.
+func toClaudeMessages(msgs []store.ChatMessage) []claude.Message {
+	out := make([]claude.Message, 0, len(msgs))
 	for _, m := range msgs {
-		if (m.Role == "user" || m.Role == "assistant") && m.Content != "" {
-			valid = append(valid, m)
-		}
+		out = append(out, claude.Message{Role: m.Role, Content: m.Content})
 	}
-	return valid
+	return out
 }
 
-func historyJSON(msgs []claude.Message) string {
-	b, _ := json.Marshal(msgs)
-	return string(b)
+// conversationFor loads the transcript referenced by the conversationId form
+// value (0 = no conversation yet). The conversation must belong to the user,
+// the URL topic, and — for study chat — the given schedule; anything else is a
+// 404, exactly like any other missing-or-not-owned resource.
+func (s *Server) conversationFor(w http.ResponseWriter, r *http.Request, topicID int64, scheduleID *int64) (convID int64, history []store.ChatMessage, ok bool) {
+	convID = int64(formInt(r, "conversationId", 0))
+	if convID == 0 {
+		return 0, nil, true
+	}
+	conv, msgs, err := s.store.GetConversationMessages(r.Context(), userFrom(r).ID, convID)
+	if err != nil {
+		s.storeError(w, r, err)
+		return 0, nil, false
+	}
+	if conv.TopicID != topicID ||
+		(scheduleID == nil) != (conv.ScheduleID == nil) ||
+		(scheduleID != nil && *conv.ScheduleID != *scheduleID) {
+		http.NotFound(w, r)
+		return 0, nil, false
+	}
+	return convID, msgs, true
 }
 
 func (s *Server) handleChatIndex(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +74,12 @@ func (s *Server) handleChatShow(w http.ResponseWriter, r *http.Request) {
 }
 
 // chatExchangeData feeds the chat_messages.html fragment: the user's bubble,
-// Claude's reply, and an OOB update of the hidden history input.
+// Claude's reply, and an OOB update of the hidden conversation-ID input.
 type chatExchangeData struct {
-	UserMessage string
-	Assistant   string
-	IsError     bool
-	HistoryJSON string
+	UserMessage    string
+	Assistant      string
+	IsError        bool
+	ConversationID int64
 }
 
 func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
@@ -89,22 +99,39 @@ func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Message is required", http.StatusBadRequest)
 		return
 	}
-	history := parseHistory(r.FormValue("history"))
+	convID, history, ok := s.conversationFor(w, r, id, nil)
+	if !ok {
+		return
+	}
 	isFirst := len(history) == 0
 
-	reply, err := s.ai.ChatAboutTopic(r.Context(), cfg, message, history, isFirst)
-	data := chatExchangeData{UserMessage: message}
+	reply, err := s.ai.ChatAboutTopic(r.Context(), cfg, message, toClaudeMessages(history), isFirst)
+	data := chatExchangeData{UserMessage: message, ConversationID: convID}
 	if err != nil {
 		// Keep the conversation alive with an error bubble (matches the
-		// Svelte chat's failure handling), with distinct copy per failure class.
+		// Svelte chat's failure handling), with distinct copy per failure
+		// class. A failed exchange leaves the stored transcript untouched.
 		data.Assistant = aiErrorMessage(err)
 		data.IsError = true
-		data.HistoryJSON = historyJSON(history)
-	} else {
-		data.Assistant = reply
-		data.HistoryJSON = historyJSON(append(history,
-			claude.Message{Role: "user", Content: message},
-			claude.Message{Role: "assistant", Content: reply}))
+		s.fragment(w, http.StatusOK, "chat_exchange", data)
+		return
 	}
+
+	userID := userFrom(r).ID
+	exchange := []store.ChatMessage{
+		{Role: "user", Content: message},
+		{Role: "assistant", Content: reply},
+	}
+	if convID == 0 {
+		convID, err = s.store.CreateConversation(r.Context(), userID, id, nil, exchange)
+	} else {
+		err = s.store.AppendChatMessages(r.Context(), userID, convID, exchange)
+	}
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	data.Assistant = reply
+	data.ConversationID = convID
 	s.fragment(w, http.StatusOK, "chat_exchange", data)
 }

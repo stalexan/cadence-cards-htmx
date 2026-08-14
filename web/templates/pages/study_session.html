@@ -7,7 +7,9 @@
   {{template "study_progress" (dict "Done" $p.Completed "Total" $p.Total "Percent" (progressPercent $p.Completed $p.Total) "Tone" (progressTone $p.Completed $p.Total))}}
 </div>
 
-<div id="study-area" hx-get="{{$p.NextURL $p.Completed}}" hx-trigger="load">
+{{/* ResumeURL carries the current card's scheduleId (when the page URL has
+     one), so a refresh re-serves the same card with its transcript. */}}
+<div id="study-area" hx-get="{{$p.ResumeURL}}" hx-trigger="load">
   <div class="panel"><div class="panel-body study-loading"><span class="spinner"></span> Loading next card…</div></div>
 </div>
 {{end}}

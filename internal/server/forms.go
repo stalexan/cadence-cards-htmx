@@ -55,17 +55,6 @@ func queryInt64Ptr(r *http.Request, key string) *int64 {
 	return &n
 }
 
-// queryInt64s collects every repeated int64 query value for key.
-func queryInt64s(r *http.Request, key string) []int64 {
-	var out []int64
-	for _, v := range r.URL.Query()[key] {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			out = append(out, n)
-		}
-	}
-	return out
-}
-
 // parseTags splits a comma-separated hidden tags input into trimmed,
 // de-duplicated tags.
 func parseTags(raw string) []string {

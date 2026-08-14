@@ -39,8 +39,9 @@ put together, request flow, and one feature traced end to end.
 - **Changed your mind? Regrade.** Clicking a different grade rewinds the schedule to its
   pre-review state and reapplies, so second-guessing yourself never compounds the interval.
 - **Skip** a card without grading it, with a confirmation so you don't do it by accident.
-- A progress bar tracks the session, and **the whole session lives in the URL** — refresh, hit
-  back, or bookmark mid-session and nothing is lost.
+- A progress bar tracks the session, and **the whole session lives in the URL** — including the
+  current card — while chat transcripts live in the database. Refresh, hit back, or bookmark
+  mid-session and you come back to the same card with its conversation intact.
 
 ### Set up a session the way you want
 

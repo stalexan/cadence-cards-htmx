@@ -251,7 +251,7 @@ func TestStudyLoop(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		"hola", `hx-post="/study/1/question"`, "grade-area", `name="version" value="0"`,
-		fmt.Sprintf(`href="/cards/%d"`, card.ID), `target="_blank"`,
+		fmt.Sprintf(`href="/cards/%d"`, card.ID),
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("next fragment missing %q", want)
@@ -264,9 +264,9 @@ func TestStudyLoop(t *testing.T) {
 		t.Errorf("question = %d, body %q", w.Code, w.Body.String())
 	}
 
-	// Chat about the answer.
+	// Chat about the answer (conversationId 0 = opened lazily server-side).
 	w = app.do("POST", "/study/1/chat", url.Values{
-		"scheduleId": {itoa(sched.ID)}, "message": {"it means hello"}, "history": {"[]"},
+		"scheduleId": {itoa(sched.ID)}, "message": {"it means hello"}, "conversationId": {"0"},
 	})
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Correct!") {
 		t.Errorf("chat = %d", w.Code)
@@ -385,7 +385,7 @@ func TestChatMessage(t *testing.T) {
 	app.login("t@example.com")
 	app.seed(false)
 
-	w := app.do("POST", "/chat/1/message", url.Values{"message": {"what does hola mean?"}, "history": {"[]"}})
+	w := app.do("POST", "/chat/1/message", url.Values{"message": {"what does hola mean?"}, "conversationId": {"0"}})
 	if w.Code != http.StatusOK {
 		t.Fatalf("chat = %d", w.Code)
 	}
@@ -394,9 +394,10 @@ func TestChatMessage(t *testing.T) {
 	if !strings.Contains(body, "<strong>Hola</strong>") {
 		t.Errorf("markdown not rendered: %s", body)
 	}
-	// OOB history update carries the transcript.
-	if !strings.Contains(body, `id="chat-history"`) || !strings.Contains(body, "hx-swap-oob") {
-		t.Error("missing OOB history update")
+	// OOB update hands the browser the server-issued conversation ID — the
+	// transcript itself stays server-side.
+	if !strings.Contains(body, `id="chat-conversation"`) || !strings.Contains(body, "hx-swap-oob") {
+		t.Error("missing OOB conversation-ID update")
 	}
 }
 

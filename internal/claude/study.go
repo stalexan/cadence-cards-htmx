@@ -61,18 +61,6 @@ func (c *Client) ChatAboutQuestion(ctx context.Context, cfg TopicConfig, card Ca
 	prompts := GeneratePrompts(cfg)
 	cardXML := FormatCardXML(card.Front, card.Back, card.Note)
 
-	// Filter out context/instruction messages if they leaked into history.
-	visible := make([]Message, 0, len(previous))
-	for _, m := range previous {
-		if m.Role == "user" && strings.Contains(m.Content, prompts.GeneralInstructions) {
-			continue
-		}
-		if m.Role == "assistant" && m.Content == "Understood." {
-			continue
-		}
-		visible = append(visible, m)
-	}
-
 	msgs := []turn{
 		{role: "user", parts: []part{
 			// Breakpoint 1: topic-stable instructions, shared across cards.
@@ -83,10 +71,11 @@ func (c *Client) ChatAboutQuestion(ctx context.Context, cfg TopicConfig, card Ca
 		// stable across every turn of this card's chat.
 		{role: "assistant", parts: []part{{text: "Understood.", cache: true}}},
 	}
-	// historyTurns marks the last history message (breakpoint 4, with the
-	// system block as the fourth — the API maximum) so long chats re-read the
-	// growing conversation from cache.
-	msgs = append(msgs, historyTurns(visible)...)
+	// History comes from the server-owned transcript (never the browser), so
+	// no defensive filtering is needed. historyTurns marks the last history
+	// message (breakpoint 4, with the system block as the fourth — the API
+	// maximum) so long chats re-read the growing conversation from cache.
+	msgs = append(msgs, historyTurns(previous)...)
 	msgs = append(msgs, turn{role: "user", parts: []part{{text: userAnswer}}})
 
 	return c.generateText(ctx, c.chatOpts, prompts.Identity, msgs)
