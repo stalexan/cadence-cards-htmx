@@ -218,7 +218,10 @@ not an error; a malformed line fails startup with the file and line number.
 | `DB_PATH` | `/data/cadence.db` | app | Compose hardcodes the volume path. Set `./dev.db` locally. |
 | `CLAUDE_API_KEY` | *(empty)* | app | Study-question generation and chat. Unset ⇒ those features return error bubbles; the rest of the app works. |
 | `CLAUDE_MODEL` | `claude-opus-5` | app | |
+| `CLAUDE_EFFORT` | `high` | app | Reasoning effort for the tutoring chat: `low`, `medium`, `high`, `xhigh`, or `max`. |
 | `CLAUDE_MAX_TOKENS` | `16000` | app | Caps thinking **and** reply together, so leave headroom — a tight value truncates the answer. Must be ≥ 1. |
+| `CLAUDE_QUESTION_MODEL` | *(empty)* | app | Model for question generation only — a small extraction task that a cheaper/faster model (e.g. `claude-haiku-4-5`) handles fine. Empty ⇒ `CLAUDE_MODEL`. |
+| `CLAUDE_QUESTION_EFFORT` | *(empty)* | app | Effort for question generation only. Empty ⇒ `CLAUDE_EFFORT`. |
 | `ENABLE_PUBLIC_REGISTRATION` | `false` | app | When off, create users with `-create-user`. |
 | `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
 | `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |
@@ -226,7 +229,8 @@ not an error; a malformed line fails startup with the file and line number.
 | `SHARED_NETWORK_NAME` | `cadence-cards-shared` | compose | External network the reverse proxy lives on. Not seen by the app. |
 
 Booleans are parsed strictly: only the literal string `true` enables them, anything else is false.
-`PORT` and `CLAUDE_MAX_TOKENS` fail startup with an error if they are set but unparseable.
+`PORT` and `CLAUDE_MAX_TOKENS` fail startup with an error if they are set but unparseable, as do
+the effort variables when set to anything outside the five levels.
 
 The version shown in the sidebar is deliberately **not** configuration: it is embedded from the
 root `VERSION` file at build time, so it cannot disagree with the binary it labels. See

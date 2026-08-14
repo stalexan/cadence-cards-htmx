@@ -17,9 +17,10 @@ type CardContent struct {
 	Note  *string
 }
 
-// GenerateQuestion asks Claude to write a practice question for a card and
-// extracts it from the <question> tag.
-func (c *Client) GenerateQuestion(ctx context.Context, cfg TopicConfig, card CardContent) (string, error) {
+// buildQuestionTurns assembles the question-generation request. Shared by the
+// live path (GenerateQuestion) and, later, batch pre-generation, so both send
+// byte-identical prompts and share cache entries.
+func buildQuestionTurns(cfg TopicConfig, card CardContent) (system string, turns []turn) {
 	prompts := GeneratePrompts(cfg)
 	cardXML := FormatCardXML(card.Front, card.Back, card.Note)
 
@@ -34,11 +35,21 @@ Place the question in an XML tag called question.`, cardXML)
 		prompt += "\n\n" + cfg.Question
 	}
 
-	resp, err := c.generateText(ctx, prompts.Identity, []Message{
-		{Role: "user", Content: prompts.StaticContext},
-		{Role: "assistant", Content: "I will help generate a practice question."},
-		{Role: "user", Content: prompt},
-	})
+	return prompts.Identity, []turn{
+		{role: "user", parts: []part{{text: prompts.StaticContext}}},
+		// Breakpoint after the ack: system + static context + ack is the
+		// topic-stable prefix shared by every card's question, so back-to-back
+		// cards in a session read it from cache instead of re-paying for it.
+		{role: "assistant", parts: []part{{text: "I will help generate a practice question.", cache: true}}},
+		{role: "user", parts: []part{{text: prompt}}},
+	}
+}
+
+// GenerateQuestion asks Claude to write a practice question for a card and
+// extracts it from the <question> tag.
+func (c *Client) GenerateQuestion(ctx context.Context, cfg TopicConfig, card CardContent) (string, error) {
+	system, turns := buildQuestionTurns(cfg, card)
+	resp, err := c.generateText(ctx, c.questionOpts, system, turns)
 	if err != nil {
 		return "", err
 	}
@@ -62,15 +73,23 @@ func (c *Client) ChatAboutQuestion(ctx context.Context, cfg TopicConfig, card Ca
 		visible = append(visible, m)
 	}
 
-	msgs := []Message{
-		{Role: "user", Content: fmt.Sprintf("%s\n\n%s\n\nHere's the card to practice:\n<card>%s</card>",
-			prompts.GeneralInstructions, prompts.PracticeInstructions, cardXML)},
-		{Role: "assistant", Content: "Understood."},
+	msgs := []turn{
+		{role: "user", parts: []part{
+			// Breakpoint 1: topic-stable instructions, shared across cards.
+			{text: prompts.GeneralInstructions + "\n\n" + prompts.PracticeInstructions, cache: true},
+			{text: "Here's the card to practice:\n<card>" + cardXML + "</card>"},
+		}},
+		// Breakpoint 2: extends the cached prefix through the card block —
+		// stable across every turn of this card's chat.
+		{role: "assistant", parts: []part{{text: "Understood.", cache: true}}},
 	}
-	msgs = append(msgs, visible...)
-	msgs = append(msgs, Message{Role: "user", Content: userAnswer})
+	// historyTurns marks the last history message (breakpoint 4, with the
+	// system block as the fourth — the API maximum) so long chats re-read the
+	// growing conversation from cache.
+	msgs = append(msgs, historyTurns(visible)...)
+	msgs = append(msgs, turn{role: "user", parts: []part{{text: userAnswer}}})
 
-	return c.generateText(ctx, prompts.Identity, msgs)
+	return c.generateText(ctx, c.chatOpts, prompts.Identity, msgs)
 }
 
 // ChatAboutTopic handles the free-form topic chat. The first message primes
@@ -78,15 +97,19 @@ func (c *Client) ChatAboutQuestion(ctx context.Context, cfg TopicConfig, card Ca
 func (c *Client) ChatAboutTopic(ctx context.Context, cfg TopicConfig, message string, previous []Message, isFirst bool) (string, error) {
 	prompts := GeneratePrompts(cfg)
 
-	var msgs []Message
+	var msgs []turn
 	if isFirst {
-		msgs = []Message{
-			{Role: "user", Content: prompts.GeneralInstructions},
-			{Role: "assistant", Content: "Understood."},
-			{Role: "user", Content: message},
+		msgs = []turn{
+			{role: "user", parts: []part{{text: prompts.GeneralInstructions}}},
+			// Breakpoint: instructions + ack are stable for the topic. Later
+			// turns deliberately don't re-send the instructions (ported
+			// behavior), so their only cacheable prefix is the history itself,
+			// marked by historyTurns.
+			{role: "assistant", parts: []part{{text: "Understood.", cache: true}}},
+			{role: "user", parts: []part{{text: message}}},
 		}
 	} else {
-		msgs = append(append(msgs, previous...), Message{Role: "user", Content: message})
+		msgs = append(historyTurns(previous), turn{role: "user", parts: []part{{text: message}}})
 	}
-	return c.generateText(ctx, prompts.Identity, msgs)
+	return c.generateText(ctx, c.chatOpts, prompts.Identity, msgs)
 }
