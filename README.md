@@ -430,7 +430,7 @@ job or maintenance task is needed for those.
 ## How it's built
 
 - **Go** backend on the standard library's `net/http` (Go 1.22+ route patterns) — no web framework.
-- **HTMX** frontend: vendored `htmx.min.js`, ~260 lines of hand-written vanilla JS, hand-written
+- **HTMX** frontend: vendored `htmx.js` (unminified), ~260 lines of hand-written vanilla JS, hand-written
   CSS. Pages and fragments are rendered server-side by `html/template`.
 - **SQLite** via the pure-Go driver `modernc.org/sqlite` — no CGo, one data file, WAL mode.
 - **Zero NPM dependencies and no frontend build step.** `web/templates` and `web/static` are
@@ -467,7 +467,7 @@ internal/markdown/    goldmark wrapper (raw HTML escaped)
 internal/claude/      anthropic-sdk-go client + prompt building
 internal/server/      handlers, middleware, template rendering
 web/templates/        html/template layouts, pages, HTMX fragments
-web/static/           htmx.min.js (vendored), app.css, app.js, favicon
+web/static/           htmx.js (vendored, unminified), app.css, app.js, favicon
 ```
 
 ## License

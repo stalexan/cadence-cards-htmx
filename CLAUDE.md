@@ -123,7 +123,8 @@ and HTMX swapping fragments.
   stdlib mux).
 - `web/` — `templates/layout/` (base = app shell with sidebar, auth = centered card),
   `templates/pages/` (each defines `title` + `content`), `templates/partials/` (named `{{define}}`s
-  used as HTMX fragments), `static/` (vendored `htmx.min.js` 2.0.10, `app.js`, `app.css`, favicon).
+  used as HTMX fragments), `static/` (vendored `htmx.js` 2.0.10, unminified, `app.js`, `app.css`,
+  favicon).
 
 ### Domain model
 
