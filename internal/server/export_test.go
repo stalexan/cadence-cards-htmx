@@ -453,9 +453,10 @@ func TestImportDetectRequiresAuth(t *testing.T) {
 	}
 }
 
-// The file picker is client-side (app.js reads the file into the textarea), so
-// the only thing the server can guarantee is that the wiring attributes ship.
-// Without them the button renders and silently does nothing.
+// Choosing and dropping a file are both client-side (app.js reads the file
+// into the textarea), so the only thing the server can guarantee is that the
+// wiring attributes ship. Without them the button renders and silently does
+// nothing.
 func TestImportPageOffersFilePicker(t *testing.T) {
 	app := newTestApp(t, nil)
 	app.login("t@example.com")
@@ -463,9 +464,11 @@ func TestImportPageOffersFilePicker(t *testing.T) {
 	body := app.do("GET", "/import", nil).Body.String()
 	for _, want := range []string{
 		`type="file"`,
-		`data-file-into="#f-yaml"`, // names the textarea app.js fills
+		`data-file-input`,
 		`accept=".yaml,.yml,text/yaml"`,
-		`data-file-name`, // the "which file did I pick" readout
+		`data-file-drop`,           // the drag-and-drop zone
+		`data-file-into="#f-yaml"`, // names the textarea both routes fill
+		`data-file-name`,           // the "which file did I pick" readout
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("import page missing %q", want)

@@ -713,6 +713,13 @@ a:hover .entity-title { color: var(--indigo-600); }
   font-size: var(--text-sm); line-height: var(--leading-sm);
   color: var(--gray-500); min-width: 0; overflow-wrap: anywhere;
 }
+/* Drag target. The outline sits outside the box so it does not shift the
+   layout mid-drag, which would move the target out from under the pointer. */
+[data-file-drop].is-dragging {
+  outline: 2px dashed var(--indigo-600); outline-offset: var(--space-2);
+  border-radius: var(--radius-md);
+}
+[data-file-drop].is-dragging .file-name { color: var(--indigo-600); }
 .input {
   font-family: inherit; font-size: var(--text-base); padding: var(--space-2);
   border: 1px solid var(--gray-300); border-radius: var(--radius-md);

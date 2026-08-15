@@ -145,36 +145,72 @@
     link.href = params.length ? base + "?" + params.join("&") : base;
   });
 
-  // ----- File picker that fills a textarea (import page) -----
+  // ----- Choose or drop a file to fill a textarea (import page) -----
   // Reads the file in the browser instead of uploading it, so the form stays
-  // a plain urlencoded POST and the pasted-vs-picked paths are the same code
-  // on the server. Dispatching "input" is what makes htmx's detect trigger
-  // fire, exactly as typing would.
-  document.addEventListener("change", function (e) {
-    var picker = e.target.closest("[data-file-into]");
-    if (!picker || !picker.files || !picker.files.length) return;
-    var target = document.querySelector(picker.getAttribute("data-file-into"));
-    if (!target) return;
-    var file = picker.files[0];
-    var name = picker.closest(".file-row");
-    name = name && name.querySelector("[data-file-name]");
+  // a plain urlencoded POST and the pasted, picked, and dropped paths are all
+  // the same code on the server. A [data-file-drop] zone names its textarea
+  // with data-file-into; both routes below funnel into loadFileInto.
+  function loadFileInto(zone, file) {
+    var target = document.querySelector(zone.getAttribute("data-file-into"));
+    if (!target || !file) return;
+    var name = zone.querySelector("[data-file-name]");
+    function say(text) { if (name) name.textContent = text; }
     // The server enforces the real 1 MB limit; this only avoids loading a
     // hopeless file into the DOM to be rejected a moment later.
     if (file.size > 1048576) {
-      if (name) name.textContent = file.name + " is larger than the 1 MB limit";
-      picker.value = "";
+      say(file.name + " is larger than the 1 MB limit");
       return;
     }
     var reader = new FileReader();
     reader.onload = function () {
       target.value = reader.result;
-      if (name) name.textContent = file.name;
+      say(file.name);
+      // What makes htmx's detect trigger fire, exactly as typing would.
       target.dispatchEvent(new Event("input", { bubbles: true }));
     };
-    reader.onerror = function () {
-      if (name) name.textContent = "Could not read " + file.name;
-    };
+    reader.onerror = function () { say("Could not read " + file.name); };
     reader.readAsText(file);
+  }
+
+  document.addEventListener("change", function (e) {
+    var picker = e.target.closest("[data-file-input]");
+    if (!picker || !picker.files || !picker.files.length) return;
+    var zone = picker.closest("[data-file-drop]");
+    if (!zone) return;
+    var file = picker.files[0];
+    // Cleared so re-picking the same file after an error still fires change.
+    picker.value = "";
+    loadFileInto(zone, file);
+  });
+
+  // Drag and drop. Scoped to the zone rather than the document: outside it the
+  // browser's own behavior (navigating to the dropped file) is left alone, so
+  // the zone is the whole field to make a near miss unlikely.
+  function dropZone(e) {
+    return e.target && e.target.closest ? e.target.closest("[data-file-drop]") : null;
+  }
+  document.addEventListener("dragover", function (e) {
+    var zone = dropZone(e);
+    if (!zone) return;
+    // Without preventDefault here the drop event never fires at all.
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    zone.classList.add("is-dragging");
+  });
+  document.addEventListener("dragleave", function (e) {
+    var zone = dropZone(e);
+    // Moving between children fires dragleave on the one being left, so only
+    // clear when the pointer has actually left the zone.
+    if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove("is-dragging");
+  });
+  document.addEventListener("drop", function (e) {
+    var zone = dropZone(e);
+    if (!zone) return;
+    // Or the browser navigates away to the file, losing anything typed.
+    e.preventDefault();
+    zone.classList.remove("is-dragging");
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) loadFileInto(zone, files[0]);
   });
 
   // ----- Import page: react to the server's format hint -----

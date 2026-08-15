@@ -18,22 +18,24 @@
          deck is a follow-up question, and only for the card format. */}}
     <form class="stack" hx-post="/import" hx-target="#import-result" hx-swap="innerHTML"
           hx-disabled-elt="find button" hx-indicator="#import-spinner">
-      <div class="field">
+      {{/* Picking or dropping a file reads it into the textarea below rather
+           than uploading it: the form stays a plain urlencoded POST, the
+           format hint fires exactly as it does for a paste, and you can see
+           and edit what you got before importing. data-file-drop marks the
+           drop zone — the whole field, so a near miss still lands — and
+           data-file-into names the textarea both routes fill. */}}
+      <div class="field" data-file-drop data-file-into="#f-yaml">
         <label class="label" for="f-yaml">YAML Content</label>
-        {{/* The picker reads the file into the textarea below rather than
-             uploading it: the form stays a plain urlencoded POST, the format
-             hint fires exactly as it does for a paste, and you can see and
-             edit what you picked before importing. The input carries no name
-             attribute, so nothing extra is submitted. */}}
         <div class="file-row">
           {{/* The input is nested rather than linked with for=, which would
-               make a label click open the picker twice in some browsers. */}}
+               make a label click open the picker twice in some browsers, and
+               carries no name attribute, so nothing extra is submitted. */}}
           <label class="btn btn-secondary btn-file">
             {{template "icon-upload"}} Choose File…
             <input type="file" id="f-file" class="sr-only" accept=".yaml,.yml,text/yaml"
-                   data-file-into="#f-yaml">
+                   data-file-input>
           </label>
-          <span class="file-name" data-file-name>or paste below</span>
+          <span class="file-name" data-file-name>or drop one here, or paste below</span>
         </div>
         {{/* The hint is rendered server-side by POST /import/detect so it runs
              the same parsers as the import itself. Debounced, and "changed"
@@ -42,8 +44,9 @@
                   hx-post="/import/detect" hx-trigger="input changed delay:400ms"
                   hx-target="#import-detect" hx-swap="innerHTML"
                   placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
-        <p class="field-help">Choose a <code>.yaml</code> file or paste an export from Cadence Cards,
-          with or without the metadata header. The format is detected automatically.</p>
+        <p class="field-help">Choose or drop a <code>.yaml</code> file, or paste an export from
+          Cadence Cards, with or without the metadata header. The format is detected
+          automatically.</p>
       </div>
 
       <div id="import-detect"></div>
