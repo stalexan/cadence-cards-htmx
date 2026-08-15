@@ -468,6 +468,7 @@ internal/claude/      anthropic-sdk-go client + prompt building
 internal/server/      handlers, middleware, template rendering
 web/templates/        html/template layouts, pages, HTMX fragments
 web/static/           htmx.js (vendored, unminified), app.css, app.js, favicon
+web/VENDOR.md         provenance + checksums for the vendored assets (the lockfile we don't have)
 ```
 
 ## License

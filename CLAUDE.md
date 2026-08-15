@@ -124,7 +124,11 @@ and HTMX swapping fragments.
 - `web/` — `templates/layout/` (base = app shell with sidebar, auth = centered card),
   `templates/pages/` (each defines `title` + `content`), `templates/partials/` (named `{{define}}`s
   used as HTMX fragments), `static/` (vendored `htmx.js` 2.0.10, unminified, `app.js`, `app.css`,
-  favicon).
+  favicon).  With no package manager, `web/VENDOR.md` **is** the lockfile for the vendored files —
+  version, source URL, SHA-256 — and `web/vendor_test.go` fails the build (including the Docker
+  build) when the record and the embedded bytes disagree, so a drop-in and its record change in the
+  same commit.  No Go test executes htmx; VENDOR.md lists the client-side flows to walk by hand
+  after an upgrade.
 
 ### Domain model
 
