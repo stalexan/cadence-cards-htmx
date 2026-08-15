@@ -67,6 +67,22 @@ func InitialState() State {
 	return State{RepCount: 0, Easiness: 2.5, Interval: 1}
 }
 
+// EasinessDecimals is how many decimal places an easiness factor is kept to.
+const EasinessDecimals = 2
+
+// RoundEasiness rounds an easiness factor to EasinessDecimals places.
+//
+// A second deliberate deviation from the JS source (alongside DaysBetween):
+// the SM-2 increments are values like 0.1 and -0.14 that binary floating point
+// cannot represent exactly, so repeated reviews accumulate visible drift and
+// store/export "2.8" as 2.8000000000000003. Two decimals is finer than the
+// smallest increment the formula can produce (0.02), so rounding here costs no
+// scheduling fidelity: intervals are themselves rounded to whole days.
+func RoundEasiness(ef float64) float64 {
+	scale := math.Pow(10, EasinessDecimals)
+	return math.Round(ef*scale) / scale
+}
+
 // DaysBetween calculates whole days between two instants, ignoring time of
 // day, using local-midnight boundaries (port of getDaysBetweenDates).
 //
@@ -105,7 +121,7 @@ func CalculateNextInterval(original State, newGrade Grade, now time.Time) State 
 	// Standard SM-2 formula: EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
 	newEasiness := original.Easiness + (0.1 - (5-quality)*(0.08+(5-quality)*0.02))
 	// 1.3 floor, no upper bound.
-	updated.Easiness = math.Max(1.3, newEasiness)
+	updated.Easiness = RoundEasiness(math.Max(1.3, newEasiness))
 
 	var newInterval, newRepCount int
 	if newGrade == GradeIncorrect {

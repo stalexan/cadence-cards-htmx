@@ -6,7 +6,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"cadence-cards/internal/sm2"
 	"cadence-cards/internal/store"
 )
 
@@ -47,6 +49,36 @@ func TestDeckExport(t *testing.T) {
 	w = app.do("GET", "/decks/"+itoa(card.DeckID)+"/export-preview", nil)
 	if w.Code != http.StatusOK || w.Header().Get("Content-Disposition") != "" {
 		t.Errorf("preview = %d, disposition %q", w.Code, w.Header().Get("Content-Disposition"))
+	}
+}
+
+// The export writes the schedule's stored easiness straight through, so this is
+// the end of the rounding chain: a card studied enough to reach an EF the
+// unrounded formula would render as 2.8000000000000003 must export as "2.8".
+func TestDeckExportWritesRoundedEasiness(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+	ctx := context.Background()
+
+	u, _, err := app.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Three perfect recalls: 2.5 -> 2.6 -> 2.7 -> 2.8.
+	sc := card.ForwardSchedule()
+	for range 3 {
+		graded, err := app.store.RecordReview(ctx, u.ID, sc.ID, sm2.GradeCorrectPerfectRecall,
+			sc.Version, time.Now())
+		if err != nil {
+			t.Fatalf("RecordReview: %v", err)
+		}
+		sc = &graded
+	}
+
+	body := app.do("GET", "/decks/"+itoa(card.DeckID)+"/export?includeSm2Params=true", nil).Body.String()
+	if !strings.Contains(body, "Easiness: 2.8\n") {
+		t.Errorf("export easiness not rounded: %s", body)
 	}
 }
 

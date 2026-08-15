@@ -70,8 +70,11 @@ and HTMX swapping fragments.
   `.env` can never override compose. A missing file is fine; `.env` is `.dockerignore`d, so this is
   local-dev only.
 - `internal/sm2/` — pure SM-2 algorithm, a port of the Svelte app's `sm2.ts` **including its
-  tests**, verbatim except that `DaysBetween` rounds instead of floors (deliberate DST fix the JS
-  source lacks). `now` is always injected as a parameter.  Due-ness uses **local-midnight day
+  tests**, verbatim except for two deliberate deviations the JS source lacks: `DaysBetween` rounds
+  instead of floors (DST fix), and easiness is put through `RoundEasiness` (2 dp) so the
+  binary-inexact EF increments cannot accumulate into stored values like `2.8000000000000003`.
+  Rounding is finer than the smallest increment the formula produces (0.02), so no due date moves.
+  `now` is always injected as a parameter.  Due-ness uses **local-midnight day
   boundaries** (`time.Local`), so the container's `TZ` matters.
 - `internal/yamlio/` — deck export/import, **byte-compatible** with the Svelte app's npm-yaml format
   (key order, defaults, `# ...` metadata header, date-only `LastSeen` as UTC calendar date,
@@ -87,7 +90,9 @@ and HTMX swapping fragments.
   what the import actually does.
 - `internal/store/` — **all SQL lives here**, one file per aggregate.  Migrations are embedded
   `.sql` files in `store/migrations/`, applied in filename order and tracked in `schema_migrations`
-  (forward-only; add `0002_*.sql` etc., never edit an applied migration).
+  (forward-only; add `0002_*.sql` etc., never edit an applied migration).  YAML import goes through
+  `sm2.RoundEasiness` in `setScheduleState`, so a Svelte export's raw float64 easiness cannot
+  reintroduce the drift `0005_round_easiness.sql` cleaned out of existing rows.
 - `internal/ratelimit/` — in-memory port of the Svelte rate limiter (general
   1000 req/15 min per IP; auth 3 fails/30 min; IP cooldown/lockout; account lockout). Constants
   mirror `rate-limiter.ts` — keep them in sync conceptually.

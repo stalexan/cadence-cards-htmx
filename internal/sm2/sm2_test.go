@@ -257,3 +257,36 @@ func TestDaysBetweenAcrossDST(t *testing.T) {
 		t.Errorf("fall-back: DaysBetween = %d, want 1", got)
 	}
 }
+
+// Also not part of the port: the JS source stores the raw float, so a card
+// graded a few times ends up with an easiness of 2.8000000000000003. Every
+// value the Go port produces is exact at two decimals, no matter how many
+// reviews compound.
+func TestEasinessNeverAccumulatesFloatDrift(t *testing.T) {
+	exactAt2dp := func(t *testing.T, ef float64) {
+		t.Helper()
+		if ef != RoundEasiness(ef) {
+			t.Errorf("easiness = %v, want a value exact at %d decimals", ef, EasinessDecimals)
+		}
+	}
+
+	// Three perfect recalls: 2.5 -> 2.6 -> 2.7 -> 2.8, where the unrounded
+	// formula lands on 2.8000000000000003.
+	s := InitialState()
+	for i := 0; i < 3; i++ {
+		s = CalculateNextInterval(s, GradeCorrectPerfectRecall, now)
+		exactAt2dp(t, s.Easiness)
+	}
+	if s.Easiness != 2.8 {
+		t.Errorf("easiness after 3 perfect recalls = %v, want 2.8", s.Easiness)
+	}
+
+	// Every grade, from every reachable easiness, stays exact.
+	for _, g := range []Grade{GradeIncorrect, GradeCorrectWithHesitation, GradeCorrectPerfectRecall} {
+		s := InitialState()
+		for i := 0; i < 50; i++ {
+			s = CalculateNextInterval(s, g, now)
+			exactAt2dp(t, s.Easiness)
+		}
+	}
+}

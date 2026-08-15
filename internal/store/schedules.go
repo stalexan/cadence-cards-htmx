@@ -172,14 +172,16 @@ func (s *Store) ResetProgress(ctx context.Context, userID, scheduleID int64) (Sc
 
 // SetScheduleState overwrites a schedule's SM-2 fields (YAML import with SM-2
 // params). Not version-checked: import creates the card and schedules in the
-// same transaction.
+// same transaction. Easiness is rounded on the way in: the file may come from
+// the Svelte app, whose exports carry full float64 drift, and stored easiness
+// is kept to sm2.EasinessDecimals everywhere.
 func setScheduleState(ctx context.Context, tx *sql.Tx, cardID int64, isReversed bool, st sm2.State) error {
 	_, err := tx.ExecContext(ctx, `
 		UPDATE schedules SET easiness = ?, interval = ?, rep_count = ?, grade = ?, last_seen = ?,
 		       prev_easiness = NULL, prev_interval = NULL, prev_rep_count = NULL,
 		       prev_grade = NULL, prev_last_seen = NULL
 		WHERE card_id = ? AND is_reversed = ?`,
-		st.Easiness, st.Interval, st.RepCount, gradeOrNil(st.Grade), fmtNullTime(st.LastSeen),
+		sm2.RoundEasiness(st.Easiness), st.Interval, st.RepCount, gradeOrNil(st.Grade), fmtNullTime(st.LastSeen),
 		cardID, boolInt(isReversed))
 	return err
 }
