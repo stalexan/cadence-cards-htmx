@@ -17,6 +17,9 @@
         </p>
       </div>
       <div class="pill-actions">
+        {{/* deckId prefills both selects on the form: the deck directly, the
+             topic through cardFormData.SelectedTopicID. */}}
+        <a class="btn btn-sm btn-soft-indigo" href="/cards/new?deckId={{$deck.ID}}">{{template "icon-plus"}}New Card</a>
         <button type="button" class="btn btn-sm btn-primary" data-open-dialog="#share-dialog">{{template "icon-share"}}Share</button>
         <a class="btn btn-sm btn-soft-success" href="/study/{{$deck.TopicID}}/setup">{{template "icon-book-open"}}Study</a>
         <a class="btn btn-sm btn-secondary" href="/decks/{{$deck.ID}}/edit">{{template "icon-pencil"}}Edit</a>

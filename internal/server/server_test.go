@@ -384,6 +384,38 @@ func TestCardTableFilterFragment(t *testing.T) {
 	}
 }
 
+// The deck page's "New Card" button carries the deck through to the form, and
+// the form pre-selects both selects from it — the topic only indirectly, via
+// the deck it owns.
+func TestDeckPageNewCardPrefillsTopicAndDeck(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+	ctx := context.Background()
+	u, _, _ := app.store.GetUserByEmail(ctx, "t@example.com")
+	deck, _ := app.store.GetDeck(ctx, u.ID, 1)
+
+	w := app.do("GET", "/decks/"+itoa(deck.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("deck page = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `href="/cards/new?deckId=`+itoa(deck.ID)+`"`) {
+		t.Fatalf("deck page has no prefilled new-card link: %s", w.Body.String())
+	}
+
+	w = app.do("GET", "/cards/new?deckId="+itoa(deck.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("card form = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `<option value="`+itoa(deck.TopicID)+`" selected>Spanish</option>`) {
+		t.Errorf("topic not preselected: %s", body)
+	}
+	if !strings.Contains(body, `<option value="`+itoa(deck.ID)+`" selected>Vocab</option>`) {
+		t.Errorf("deck not preselected: %s", body)
+	}
+}
+
 func TestChatMessage(t *testing.T) {
 	app := newTestApp(t, stubAI{reply: "¡Claro! **Hola** means hello."})
 	app.login("t@example.com")
