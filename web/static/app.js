@@ -123,13 +123,26 @@
     }
   });
 
-  // ----- Export dialog: toggle includeSm2Params on the download link -----
+  // ----- Export dialogs: rebuild the download href from the toggles -----
+  // Scoped to the dialog rather than a fixed element id, so the deck dialog
+  // (one toggle) and the topic dialog (two) share one handler. Every checked
+  // toggle in the scope contributes a query param, not just the one that
+  // changed.
   document.addEventListener("change", function (e) {
     var box = e.target.closest("[data-export-toggle]");
     if (!box) return;
-    var link = document.getElementById("share-download");
-    var base = box.getAttribute("data-export-base");
-    link.href = box.checked ? base + "?includeSm2Params=true" : base;
+    var scope = box.closest("[data-export-scope]");
+    if (!scope) return;
+    var link = scope.querySelector("[data-export-download]");
+    if (!link) return;
+    var base = scope.getAttribute("data-export-base");
+    var params = [];
+    scope.querySelectorAll("[data-export-toggle]").forEach(function (t) {
+      if (t.checked) {
+        params.push(encodeURIComponent(t.name) + "=" + encodeURIComponent(t.value));
+      }
+    });
+    link.href = params.length ? base + "?" + params.join("&") : base;
   });
 
   // ----- Tag chips (card forms) -----

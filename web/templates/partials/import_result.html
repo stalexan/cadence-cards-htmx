@@ -9,7 +9,12 @@
     <div class="alert-body">
       <h3 class="alert-title">{{.Message}}</h3>
       <div class="alert-text">
+        {{if .IsTopic}}
+        Created topic <a class="entity-link" href="/topics/{{.TopicID}}">{{.TopicName}}</a> with
+        {{.DeckCount}} deck{{if ne .DeckCount 1}}s{{end}} and {{.ImportedCount}} card{{if ne .ImportedCount 1}}s{{end}}.{{if .TopicRenamed}} A topic with the original name already existed, so this one was renamed.{{end}}{{if gt .FailedCount 0}} {{.FailedCount}} item{{if ne .FailedCount 1}}s{{end}} failed.{{end}}
+        {{else}}
         Imported {{.ImportedCount}} card{{if ne .ImportedCount 1}}s{{end}} into “{{.DeckName}}”.{{if gt .FailedCount 0}} {{.FailedCount}} card{{if ne .FailedCount 1}}s{{end}} failed.{{end}}{{if .MadeBidirectional}} The deck was switched to bidirectional so the imported reverse progress is studied.{{end}}
+        {{end}}
       </div>
     </div>
   </div>

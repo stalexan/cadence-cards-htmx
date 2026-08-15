@@ -26,6 +26,7 @@ func TestPartialsExecuteAgainstZeroValues(t *testing.T) {
 		{"study_question", studyQuestionData{}},
 		{"chat_exchange", chatExchangeData{}},
 		{"chat_composer", chatComposerData{}},
+		{"import_result", importResultData{}},
 	}
 	for _, c := range cases {
 		if err := partials.ExecuteTemplate(io.Discard, c.name, c.data); err != nil {

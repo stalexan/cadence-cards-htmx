@@ -123,10 +123,11 @@ type sm2ReverseCard struct {
 	ReverseInterval int     `yaml:"ReverseInterval"`
 }
 
-// Export serializes cards to the shared YAML format (port of
-// exportCardsToYaml). SM-2 parameters are included only when includeSM2 is
-// set; the metadata comment header only when meta is non-nil.
-func Export(cards []ExportCard, meta *Metadata, includeSM2 bool) (string, error) {
+// cardNodes builds the ordered per-card shapes for one card list. Both the
+// deck export (a bare sequence of these) and the topic export (the same
+// sequence nested under each deck) go through here, so the card block cannot
+// drift between the two formats.
+func cardNodes(cards []ExportCard, includeSM2 bool) []any {
 	out := make([]any, len(cards))
 	for i, c := range cards {
 		tags := c.Tags
@@ -166,6 +167,14 @@ func Export(cards []ExportCard, meta *Metadata, includeSM2 bool) (string, error)
 			ReverseInterval: c.Reverse.Interval,
 		}
 	}
+	return out
+}
+
+// Export serializes cards to the shared YAML format (port of
+// exportCardsToYaml). SM-2 parameters are included only when includeSM2 is
+// set; the metadata comment header only when meta is non-nil.
+func Export(cards []ExportCard, meta *Metadata, includeSM2 bool) (string, error) {
+	out := cardNodes(cards, includeSM2)
 
 	var sb strings.Builder
 	enc := yaml.NewEncoder(&sb)

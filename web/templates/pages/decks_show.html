@@ -52,7 +52,8 @@
   {{template "card_table" $d.Table}}
 </div>
 
-<dialog id="share-dialog" class="dialog dialog-2xl">
+<dialog id="share-dialog" class="dialog dialog-2xl"
+        data-export-scope data-export-base="/decks/{{$deck.ID}}/export">
   <div class="dialog-body">
     <h3 class="dialog-title">Export “{{$deck.Name}}”</h3>
     <div class="dialog-content">
@@ -61,7 +62,7 @@
         {{/* textContent, never innerHTML: the response is raw YAML, and HTML
              parsing would mangle card content like "Vector<int>". */}}
         <input type="checkbox" id="share-include-sm2" name="includeSm2Params" value="true"
-               data-export-toggle data-export-base="/decks/{{$deck.ID}}/export"
+               data-export-toggle
                hx-get="/decks/{{$deck.ID}}/export-preview" hx-target="#share-yaml" hx-swap="textContent"
                hx-trigger="change">
         <span class="check-label">Include SM-2 study progress</span>
@@ -76,7 +77,8 @@
     </div>
   </div>
   <div class="dialog-footer">
-    <a class="btn btn-primary" id="share-download" href="/decks/{{$deck.ID}}/export" download>{{template "icon-download"}} Download YAML</a>
+    <a class="btn btn-primary" id="share-download" data-export-download
+       href="/decks/{{$deck.ID}}/export" download>{{template "icon-download"}} Download YAML</a>
     <button type="button" class="btn btn-secondary" data-copy-target="#share-yaml">{{template "icon-clipboard"}} Copy</button>
     <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
   </div>

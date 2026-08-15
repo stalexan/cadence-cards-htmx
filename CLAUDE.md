@@ -71,6 +71,11 @@ and HTMX swapping fragments.
   (key order, defaults, `# ...` metadata header, date-only `LastSeen` as UTC calendar date,
   `Reverse*` twins, Easiness ≥ 1.3 with **no upper cap**). Golden tests pin the format — if they
   fail, fix the code, not the golden file, unless the format change is deliberate on both apps.
+  `topic.go` adds a **topic** format (a mapping: `Topic:` config + optional `Decks:` with their
+  settings and cards) that is **Go-only** — the Svelte app has no counterpart, so it is free to
+  evolve. Its per-deck card blocks are built by the shared `cardNodes`/`decodeCard`, so they stay
+  identical to the deck format; `TestTopicCardBlockMatchesDeckFormat` is the guard. A deck file is a
+  sequence and a topic file is a mapping, which is what `Detect` keys on to route `POST /import`.
 - `internal/store/` — **all SQL lives here**, one file per aggregate.  Migrations are embedded
   `.sql` files in `store/migrations/`, applied in filename order and tracked in `schema_migrations`
   (forward-only; add `0002_*.sql` etc., never edit an applied migration).

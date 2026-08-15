@@ -67,43 +67,53 @@ func (s *Store) ImportCards(ctx context.Context, userID, deckID int64, cards []I
 		}
 
 		for _, p := range cards {
-			res, err := tx.ExecContext(ctx, `
-				INSERT INTO cards (deck_id, front, back, note, priority, tags)
-				VALUES (?, ?, ?, ?, ?, ?)`,
-				deckID, p.Front, p.Back, strOrNil(p.Note), string(p.Priority), encodeTags(p.Tags))
-			if err != nil {
+			if err := insertCard(ctx, tx, deckID, bidir == 1, p); err != nil {
 				return err
-			}
-			cardID, err := res.LastInsertId()
-			if err != nil {
-				return err
-			}
-
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO schedules (card_id, is_reversed) VALUES (?, 0)`, cardID); err != nil {
-				return err
-			}
-			if err := setScheduleState(ctx, tx, cardID, false, p.Forward); err != nil {
-				return err
-			}
-
-			if bidir == 1 || p.Reverse != nil {
-				if _, err := tx.ExecContext(ctx,
-					`INSERT INTO schedules (card_id, is_reversed) VALUES (?, 1)`, cardID); err != nil {
-					return err
-				}
-				rev := sm2.InitialState()
-				if p.Reverse != nil {
-					rev = *p.Reverse
-				}
-				if err := setScheduleState(ctx, tx, cardID, true, rev); err != nil {
-					return err
-				}
 			}
 		}
 		return nil
 	})
 	return madeBidirectional, err
+}
+
+// insertCard inserts one imported card and its schedules inside an open
+// transaction. A reverse schedule is created when the deck is bidirectional or
+// the card carried reverse SM-2 params. Shared by ImportCards and ImportTopic.
+func insertCard(ctx context.Context, tx *sql.Tx, deckID int64, bidir bool, p ImportCardParams) error {
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO cards (deck_id, front, back, note, priority, tags)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		deckID, p.Front, p.Back, strOrNil(p.Note), string(p.Priority), encodeTags(p.Tags))
+	if err != nil {
+		return err
+	}
+	cardID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO schedules (card_id, is_reversed) VALUES (?, 0)`, cardID); err != nil {
+		return err
+	}
+	if err := setScheduleState(ctx, tx, cardID, false, p.Forward); err != nil {
+		return err
+	}
+
+	if bidir || p.Reverse != nil {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO schedules (card_id, is_reversed) VALUES (?, 1)`, cardID); err != nil {
+			return err
+		}
+		rev := sm2.InitialState()
+		if p.Reverse != nil {
+			rev = *p.Reverse
+		}
+		if err := setScheduleState(ctx, tx, cardID, true, rev); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // anyReverse reports whether any card carried reverse SM-2 params.

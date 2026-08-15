@@ -89,6 +89,8 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("GET /topics/{id}/edit", auth(s.handleTopicEditPage))
 	mux.HandleFunc("POST /topics/{id}", auth(s.handleTopicUpdate))
 	mux.HandleFunc("POST /topics/{id}/delete", auth(s.handleTopicDelete))
+	mux.HandleFunc("GET /topics/{id}/export", auth(s.handleTopicExport))
+	mux.HandleFunc("GET /topics/{id}/export-preview", auth(s.handleTopicExportPreview))
 
 	mux.HandleFunc("GET /decks", auth(s.handleDecksList))
 	mux.HandleFunc("GET /decks/grid", auth(s.handleDecksGridFragment))

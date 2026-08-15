@@ -107,17 +107,23 @@ view you're looking at is a link you can share or bookmark:
 
 - **Export** any deck as YAML, with or without SM-2 study progress. Copy it from a dialog or
   download it as `<deck_name>_cards.yaml`.
-- **Import** by pasting YAML into a target deck (1 MB limit). The metadata header is optional.
+- **Export a whole topic** — its Claude configuration and, optionally, every deck and card it owns —
+  as `<topic_name>_topic.yaml`. Leave the decks toggle off for a configuration-only file.
+- **Import** by pasting YAML (1 MB limit). The format is detected automatically: a list of cards goes
+  into the deck you pick, a topic export creates a new topic with its own decks. The metadata header
+  is optional either way.
 - **Validation reports each bad card individually** ("Card at index 4: …") and imports the rest
   rather than aborting the whole file.
 - If the YAML carries reverse-direction SM-2 parameters and the target deck is one-directional, the
   deck is switched to bidirectional so that progress is actually used.
+- Importing a topic whose name is already taken **renames** it (`Spanish (2)`) rather than failing, so
+  the same file can be imported repeatedly.
 
 <img src="docs/images/03-export-deck.png" width="700"
      alt="The export dialog on a deck page, with an Include SM-2 study progress checkbox, a preview
           of the generated YAML, and Copy and Download buttons">
 
-The format is a plain YAML list, optionally preceded by a `#` comment header:
+A **deck** export is a plain YAML list, optionally preceded by a `#` comment header:
 
 ```yaml
 # ============================================
@@ -153,6 +159,49 @@ The format is a plain YAML list, optionally preceded by a `#` comment header:
 `Easiness: 2.5`, `Interval: 1`, `Tags: []`). Dates are date-only. The `LastSeen`/`Grade`/`RepCount`/
 `Easiness`/`Interval` block and its `Reverse*` twin are omitted entirely when you export without
 study progress. Grades are `CORRECT_PERFECT_RECALL`, `CORRECT_WITH_HESITATION`, or `INCORRECT`.
+
+A **topic** export is a mapping instead of a list — which is how the two are told apart on import.
+Only `Topic.Name` is required; `Decks` is absent in a configuration-only file, and each deck's
+`Cards` entries use exactly the card format above:
+
+```yaml
+# ============================================
+# Flashcard Topic Export
+# ============================================
+# Format Version: 1.0
+# Topic: Spanish
+# Creator: Sean
+# Exported: 2026-08-15
+# Decks: 1
+# Cards: 1
+# ============================================
+
+Topic:
+  Name: Spanish
+  TopicDescription: Travel Spanish
+  Expertise: patient tutor
+  Focus: null
+  ContextType: null
+  Example: null
+  Question: null
+Decks:
+  - Name: Verbs
+    Field1Label: Spanish
+    Field2Label: null
+    IsBidirectional: true
+    Cards:
+      - ID: 1
+        Front: hablar
+        Back: to speak
+        Note: null
+        Priority: A
+        Tags: []
+```
+
+Unlike the deck format, a topic export carries each deck's own settings (`Field1Label`,
+`Field2Label`, `IsBidirectional`), so a bidirectional deck stays bidirectional even when you export
+without study progress. The topic format is specific to this app and has no counterpart in the
+sibling Svelte project; the card blocks inside it remain the shared, interchangeable format.
 
 ### Dashboard
 

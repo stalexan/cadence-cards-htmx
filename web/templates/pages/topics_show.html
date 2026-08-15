@@ -14,6 +14,7 @@
         <p class="detail-meta">Created on {{formatDate $t.CreatedAt}}</p>
       </div>
       <div class="pill-actions">
+        <button type="button" class="btn btn-sm btn-primary" data-open-dialog="#topic-share-dialog">{{template "icon-share"}}Export</button>
         <a class="btn btn-sm btn-soft-indigo" href="/chat/{{$t.ID}}">{{template "icon-chat"}}Chat</a>
         <a class="btn btn-sm btn-soft-success" href="/study/{{$t.ID}}/setup">{{template "icon-book-open"}}Study</a>
         <a class="btn btn-sm btn-secondary" href="/topics/{{$t.ID}}/edit">{{template "icon-pencil"}}Edit</a>
@@ -104,4 +105,45 @@
     </div>
   </div>
 </div>
+
+{{/* Mirrors the deck share dialog. Two toggles instead of one, so the download
+     href is rebuilt from the whole scope by app.js, and each toggle's
+     hx-get includes the other via hx-include — htmx would otherwise send only
+     the element that changed. */}}
+<dialog id="topic-share-dialog" class="dialog dialog-2xl"
+        data-export-scope data-export-base="/topics/{{$t.ID}}/export">
+  <div class="dialog-body">
+    <h3 class="dialog-title">Export “{{$t.Name}}”</h3>
+    <div class="dialog-content">
+      <p class="dialog-message">Download the topic as YAML, or copy it below. It carries the topic’s Claude configuration and, if you choose, all of its decks and cards.</p>
+      <label class="check-field share-toggle">
+        {{/* textContent, never innerHTML: the response is raw YAML, and HTML
+             parsing would mangle card content like "Vector<int>". */}}
+        <input type="checkbox" name="includeDecks" value="true" checked
+               data-export-toggle hx-include="closest [data-export-scope]"
+               hx-get="/topics/{{$t.ID}}/export-preview" hx-target="#topic-share-yaml" hx-swap="textContent"
+               hx-trigger="change">
+        <span class="check-label">Include decks and cards</span>
+      </label>
+      <label class="check-field share-toggle">
+        <input type="checkbox" name="includeSm2Params" value="true"
+               data-export-toggle hx-include="closest [data-export-scope]"
+               hx-get="/topics/{{$t.ID}}/export-preview" hx-target="#topic-share-yaml" hx-swap="textContent"
+               hx-trigger="change">
+        <span class="check-label">Include SM-2 study progress</span>
+      </label>
+      {{/* dialog-opened is dispatched by the data-open-dialog handler in
+           app.js ("revealed" fires eagerly: a closed dialog's zero rect passes
+           htmx's viewport check). */}}
+      <textarea class="input mono share-yaml" id="topic-share-yaml" readonly rows="14"
+                hx-get="/topics/{{$t.ID}}/export-preview?includeDecks=true"
+                hx-trigger="dialog-opened once from:closest dialog" hx-swap="textContent"></textarea>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <a class="btn btn-primary" data-export-download href="/topics/{{$t.ID}}/export?includeDecks=true" download>{{template "icon-download"}} Download YAML</a>
+    <button type="button" class="btn btn-secondary" data-copy-target="#topic-share-yaml">{{template "icon-clipboard"}} Copy</button>
+    <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
+  </div>
+</dialog>
 {{end}}

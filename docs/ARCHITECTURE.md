@@ -249,7 +249,7 @@ separate `schema.sql` to read; the migrations *are* the schema.
 | `internal/claude` | Anthropic SDK client, prompt building, the three study operations, batch question generation |
 | `internal/pregen` | Nightly job pre-generating questions for due-soon cards via the Message Batches API |
 | `internal/markdown` | Renders Claude's replies to HTML (escaped — this is the XSS boundary) |
-| `internal/yamlio` | Deck import/export, byte-compatible with the sibling Svelte app's format |
+| `internal/yamlio` | Deck import/export (byte-compatible with the sibling Svelte app's format) and the Go-only topic format |
 | `internal/config` | Env var parsing (`DB_PATH`, `CLAUDE_*`, `.env` loading) |
 | `internal/ratelimit` | In-memory per-IP/per-account rate limiting |
 | `web/` | Templates, static assets — embedded into the binary via `go:embed` |
@@ -284,7 +284,8 @@ Three tiers, matching the three kinds of code above:
 - **Pure packages** (`sm2`, `yamlio`, `markdown`) test against an injected `now` and fixed inputs.
   `yamlio`'s golden tests pin the export format byte-for-byte against the Svelte app's output — if
   one fails, the code is wrong, not the fixture, unless the format change is deliberate on both
-  apps.
+  apps. The topic format has its own golden test plus a regression asserting its nested card blocks
+  still match the deck format's, since both are emitted by the same `cardNodes`.
 - **The store** gets a real SQLite file in a `t.TempDir()` per test — migrations and all. There's no
   mocking layer and no interface in front of `*store.Store`; it's fast enough not to need one.
 - **Handlers** run the *entire* middleware chain through `httptest`, driven by the `newTestApp`

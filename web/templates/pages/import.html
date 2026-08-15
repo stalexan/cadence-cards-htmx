@@ -10,36 +10,34 @@
   <div class="panel-body">
     {{/* Result goes above the form, as in the reference — not below it. */}}
     <div id="import-result"></div>
-    {{if $d.Decks}}
+    {{/* The form always renders: a topic export brings its own decks, so an
+         account with no decks can still import one. The deck select is only
+         needed for the card format. */}}
     <form class="stack" hx-post="/import" hx-target="#import-result" hx-swap="innerHTML"
           hx-disabled-elt="find button" hx-indicator="#import-spinner">
       <div class="field">
         <label class="label" for="f-deck">Target Deck</label>
-        <select class="input select" id="f-deck" name="deckId" required>
+        <select class="input select" id="f-deck" name="deckId">
           <option value="">Select a deck…</option>
           {{range $d.Decks}}<option value="{{.ID}}">{{.TopicName}} / {{.Name}}</option>{{end}}
         </select>
-        <p class="field-help">Cards import into this deck. SM-2 progress in the YAML is preserved.</p>
+        {{if $d.Decks}}
+        <p class="field-help">Required when importing a list of cards; ignored for a topic export, which creates its own decks.</p>
+        {{else}}
+        <p class="field-help">You have no decks yet. You can still import a topic export, which creates its own decks — or <a class="entity-link" href="/decks/new">create a deck</a> first to import a card list.</p>
+        {{end}}
       </div>
       <div class="field">
         <label class="label" for="f-yaml">YAML Content</label>
         <textarea class="input mono" id="f-yaml" name="yamlContent" rows="15" required
                   placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
-        <p class="field-help">Paste YAML exported from Cadence Cards, with or without the metadata header.</p>
+        <p class="field-help">Paste a card list or a topic export from Cadence Cards, with or without the metadata header. The format is detected automatically.</p>
       </div>
       <div class="actions-end">
         <span id="import-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
         <button type="submit" class="btn btn-primary">{{template "icon-upload"}} Import</button>
       </div>
     </form>
-    {{else}}
-    <div class="empty-state">
-      {{template "icon-book-open"}}
-      <h3>No decks yet</h3>
-      <p>You need a deck before importing cards.</p>
-      <a class="btn btn-primary" href="/decks/new">{{template "icon-plus"}} Create a deck</a>
-    </div>
-    {{end}}
   </div>
 </div>
 {{end}}
