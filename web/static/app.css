@@ -761,6 +761,57 @@ input[type="radio"], input[type="checkbox"] {
 .tag-entry { flex: 1 1 8rem; min-width: 8rem; border: 0; box-shadow: none; padding-left: 0; }
 .tag-entry:focus { outline: none; }
 
+/* Disclosure — a native <details> for optional form settings (topic form's
+   tutoring style). No JS: the browser owns the open/closed state, which is
+   what keeps it working inside an htmx swap. */
+.disclosure {
+  border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+.disclosure-summary {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer; user-select: none;
+  font-size: var(--text-sm); line-height: var(--leading-sm);
+  border-radius: var(--radius-md);
+  /* Both lines are needed to drop the native triangle: Firefox/Chrome honour
+     list-style, older WebKit only the pseudo-element. The chevron below
+     replaces it so the marker can sit inside the flex row. */
+  list-style: none;
+}
+.disclosure-summary::-webkit-details-marker { display: none; }
+.disclosure-summary:hover { background: var(--gray-100); }
+.disclosure-summary:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
+.disclosure-title { font-weight: 500; color: var(--gray-700); }
+.disclosure-note { font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--gray-500); }
+.disclosure-chevron { display: inline-flex; align-self: center; color: var(--gray-400); }
+.disclosure-chevron .icon { width: 1rem; height: 1rem; transition: transform 120ms ease; }
+.disclosure[open] .disclosure-chevron .icon { transform: rotate(90deg); }
+.disclosure-body {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  padding: var(--space-4); padding-top: var(--space-2);
+  border-top: 1px solid var(--gray-200); margin-top: var(--space-1);
+  background: #fff;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* AI-assisted fill box at the top of the topic form. */
+.suggest-box {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--indigo-200); border-radius: var(--radius-md);
+  background: var(--indigo-50);
+}
+.suggest-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+/* Grows to fill the row, but wraps the button below it rather than crushing
+   the input on a narrow screen. */
+.suggest-row .input { flex: 1 1 14rem; min-width: 0; }
+.suggest-row .btn { flex: 0 0 auto; }
+.suggest-box .field-help { color: var(--gray-600); }
+/* An alert sitting directly in a .stack (the suggest box's result) is spaced by
+   the stack's gap, so its own bottom margin would double the gap. */
+.stack > .alert { margin-bottom: 0; }
+
 /* Submit busy state. app.js flips data-busy on the form; the label swap is
    pure CSS so it works without touching the button's markup at runtime. */
 .btn-busy { display: none; }

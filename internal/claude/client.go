@@ -34,6 +34,13 @@ var (
 	// ErrBadAuth is a 401/403: invalid key, revoked key, or out of credit.
 	// Retrying won't help until the operator fixes the key.
 	ErrBadAuth = errors.New("claude API key rejected")
+
+	// ErrNotConfigured means the server was started without CLAUDE_API_KEY.
+	// Distinct from ErrBadAuth because the fix is different (set a key, rather
+	// than repair the one that is set) and because nothing was ever sent: it is
+	// returned before the request, so the user is not left waiting out a
+	// round-trip and retries for an answer that cannot arrive.
+	ErrNotConfigured = errors.New("claude API key not configured")
 )
 
 // Message is one visible chat turn.
@@ -111,7 +118,12 @@ type Client struct {
 	api          anthropic.Client
 	chatOpts     reqOptions
 	questionOpts reqOptions
-	Tracker      TokenTracker
+	// configured records whether a key was supplied. Without it the SDK would
+	// fall through to its own credential discovery (env vars, profile file) and
+	// fail with a local error that carries no HTTP status, so classifyAPIError
+	// cannot recognise it and every caller reports a generic "try again".
+	configured bool
+	Tracker    TokenTracker
 }
 
 // New builds a Client from configuration.
@@ -134,6 +146,7 @@ func New(cfg config.Config) *Client {
 		api:          anthropic.NewClient(option.WithAPIKey(cfg.ClaudeAPIKey), option.WithMaxRetries(2)),
 		chatOpts:     chat,
 		questionOpts: question,
+		configured:   cfg.ClaudeAPIKey != "",
 	}
 }
 
@@ -214,6 +227,13 @@ func classifyAPIError(err error) error {
 // generateText sends one request and returns the first text block, mirroring
 // generateText in client.ts.
 func (c *Client) generateText(ctx context.Context, opts reqOptions, system string, turns []turn) (string, error) {
+	// Refused before the request, not after: with no key the SDK would spend a
+	// round-trip discovering it has no credentials and then fail with an error
+	// no status code can classify.
+	if !c.configured {
+		return "", ErrNotConfigured
+	}
+
 	// Budget: one slow generation plus up to two SDK retries (a 429 retry
 	// waits out retry-after before re-sending). The context is the hard
 	// user-facing cap — the SDK gives up as soon as it expires.

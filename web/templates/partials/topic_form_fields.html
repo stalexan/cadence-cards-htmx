@@ -1,0 +1,111 @@
+{{/* Every input on the topic form. Context: topicFieldsData.
+
+     Rendered two ways from the same definition: by topics_form.html on page
+     load, and by POST /topics/suggest, which returns this whole block with
+     Claude's proposal already in the inputs. That is why the suggest box lives
+     in here too — it is inside the swapped region, so it has to re-render with
+     its text intact.
+
+     Placeholders on the optional inputs are the prompt builder's real
+     fallbacks (claude.PromptDefaults), so a field left empty shows what the
+     tutor will actually be told. */}}
+{{define "topic_form_fields"}}
+{{$v := .Values}}
+{{$d := .Defaults}}
+
+{{/* Suggest box. The button is type="button" so it never submits the form, and
+     hx-include sends the form's current values so the handler can see which
+     fields are already filled and leave them alone. */}}
+<div class="suggest-box">
+  <label class="label" for="f-seed">What are you studying?</label>
+  <div class="suggest-row">
+    <input class="input" id="f-seed" type="text" name="seed" value="{{.Seed}}"
+           placeholder="Mexican Spanish — vocabulary and grammar">
+    <button type="button" class="btn btn-secondary"
+            hx-post="/topics/suggest" hx-include="closest form"
+            hx-target="#topic-fields" hx-swap="innerHTML"
+            hx-disabled-elt="this" hx-indicator="#suggest-spinner">
+      {{template "icon-sparkles"}}<span>Suggest settings</span>
+    </button>
+    <span id="suggest-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </div>
+  <p class="field-help">Optional. Claude fills in the empty fields below from your
+    description, leaving anything you have already written alone. Nothing is saved
+    until you submit the form, and you can edit everything it writes.</p>
+</div>
+
+{{if .Error}}{{template "alert" (dict "Kind" "error" "Body" .Error)}}{{end}}
+{{if .Notice}}
+<div class="alert alert-compact alert-success">
+  {{template "icon-check-circle"}}
+  <div class="alert-body"><span class="alert-title">{{.Notice}}</span></div>
+</div>
+{{end}}
+
+<div class="field">
+  <label class="label" for="f-name">Topic Name</label>
+  <input class="input" id="f-name" type="text" name="name" required value="{{$v.Name}}">
+  <p class="field-help">The short name shown in menus, e.g. “Spanish”.</p>
+</div>
+
+<div class="field">
+  <label class="label" for="f-desc">Topic Description</label>
+  <input class="input" id="f-desc" type="text" name="topicDescription"
+         value="{{deref $v.TopicDescription}}" placeholder="Same as the topic name">
+  <p class="field-help">A more specific description of the subject area, e.g.
+    “Mexican Spanish”. The tutor is told it specializes in this.</p>
+</div>
+
+{{/* The five remaining settings are all optional and all have working
+     defaults, so they start collapsed on a blank form. ShowAdvanced opens them
+     whenever there is something inside worth seeing. */}}
+<details class="disclosure"{{if .ShowAdvanced}} open{{end}}>
+  <summary class="disclosure-summary">
+    <span class="disclosure-chevron">{{template "icon-chevron-right"}}</span>
+    <span class="disclosure-title">Tutoring style</span>
+    <span class="disclosure-note">optional — five settings that shape how Claude teaches this topic</span>
+  </summary>
+  <div class="disclosure-body">
+    <div class="field">
+      <label class="label" for="f-expertise">Expertise</label>
+      <input class="input" id="f-expertise" type="text" name="expertise"
+             value="{{deref $v.Expertise}}" placeholder="{{$d.Expertise}}">
+      <p class="field-help">The role Claude takes: “You are a knowledgeable
+        {{if $v.Name}}{{$v.Name}} {{end}}<em>language tutor</em>…”</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-focus">Focus</label>
+      <input class="input" id="f-focus" type="text" name="focus"
+             value="{{deref $v.Focus}}" placeholder="{{$d.Focus}}">
+      <p class="field-help">What to emphasize: “…provide explanations about
+        <em>vocabulary and grammar</em>…”</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-context">Context Type</label>
+      <input class="input" id="f-context" type="text" name="contextType"
+             value="{{deref $v.ContextType}}" placeholder="{{$d.ContextType}}">
+      <p class="field-help">The extra context Claude volunteers: “…and offer
+        <em>cultural context</em> when relevant.”</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-example">Example Exchange</label>
+      <textarea class="input" id="f-example" name="example" rows="10">{{deref $v.Example}}</textarea>
+      <p class="field-help">One exchange showing how Claude should answer a question about
+        this topic — write it as <code>H:</code> for the learner and <code>A:</code> for
+        Claude. It is wrapped in <code>&lt;example&gt;</code> tags for you, and a
+        practice-mode example is added automatically, so just write the exchange
+        itself.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-question">Question Prompt</label>
+      <textarea class="input" id="f-question" name="question" rows="8">{{deref $v.Question}}</textarea>
+      <p class="field-help">Extra instructions appended when Claude writes a practice
+        question from a card — for example, whether to give hints.</p>
+    </div>
+  </div>
+</details>
+{{end}}

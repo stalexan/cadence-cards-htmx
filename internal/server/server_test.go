@@ -19,9 +19,10 @@ import (
 
 // stubAI implements the AI interface without network calls.
 type stubAI struct {
-	question string
-	reply    string
-	err      error
+	question   string
+	reply      string
+	suggestion claude.TopicSuggestion
+	err        error
 }
 
 func (s stubAI) GenerateQuestion(context.Context, claude.TopicConfig, claude.CardContent) (string, error) {
@@ -32,6 +33,9 @@ func (s stubAI) ChatAboutQuestion(context.Context, claude.TopicConfig, claude.Ca
 }
 func (s stubAI) ChatAboutTopic(context.Context, claude.TopicConfig, string, []claude.Message, bool) (string, error) {
 	return s.reply, s.err
+}
+func (s stubAI) SuggestTopicConfig(context.Context, string) (claude.TopicSuggestion, error) {
+	return s.suggestion, s.err
 }
 
 type testApp struct {
@@ -577,5 +581,144 @@ func TestCardsTableFragmentPushesFilterURL(t *testing.T) {
 	w = app.do("GET", "/decks/grid?q=vo", nil)
 	if got := w.Header().Get("HX-Push-Url"); got != "/decks?q=vo" {
 		t.Errorf("deck grid HX-Push-Url = %q, want /decks?q=vo", got)
+	}
+}
+
+// suggestionFixture is a full proposal, so a test can assert on any field.
+var suggestionFixture = claude.TopicSuggestion{
+	Name:        "Spanish",
+	TopicDesc:   "Mexican Spanish",
+	Expertise:   "language tutor",
+	Focus:       "vocabulary and grammar",
+	ContextType: "cultural context",
+	Example:     "H: What does 'pelo' mean?\n\nA: Hair, anywhere on the body.",
+	Question:    "Ask about the back of the card without revealing it.",
+}
+
+// The suggestion fills blanks and leaves typed values alone — the property that
+// makes the button safe to press on a half-filled or already-saved topic.
+func TestTopicSuggestFillsOnlyBlankFields(t *testing.T) {
+	app := newTestApp(t, stubAI{suggestion: suggestionFixture})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/topics/suggest", url.Values{
+		"seed": {"Mexican Spanish, vocabulary and grammar"},
+		// Already typed by the user; must survive.
+		"name":  {"Español"},
+		"focus": {"just the subjunctive"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("suggest = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	// Matched as rendered input values, not bare substrings: the field help
+	// quotes phrases like "language tutor" as examples, so a plain Contains
+	// would pass whether or not the input was actually filled.
+	for _, keep := range []string{"Español", "just the subjunctive"} {
+		if !strings.Contains(body, `value="`+keep+`"`) {
+			t.Errorf("suggest overwrote a typed value: %q not in an input", keep)
+		}
+	}
+	if strings.Contains(body, `value="Spanish"`) {
+		t.Error("suggested name replaced the typed one")
+	}
+	for _, filled := range []string{"Mexican Spanish", "language tutor", "cultural context"} {
+		if !strings.Contains(body, `value="`+filled+`"`) {
+			t.Errorf("blank field not filled: %q not in an input", filled)
+		}
+	}
+	if !strings.Contains(body, suggestionFixture.Question) {
+		t.Error("suggested question prompt not rendered into its textarea")
+	}
+	// 5 of 7 were blank (name and focus were typed).
+	if !strings.Contains(body, "5 fields filled in") {
+		t.Errorf("notice missing or miscounted; body: %.400s", body)
+	}
+	// A suggestion always writes optional settings, so they must come back open
+	// or the user cannot see what was proposed.
+	if !strings.Contains(body, "<details class=\"disclosure\" open>") {
+		t.Error("optional settings stayed collapsed after a suggestion")
+	}
+}
+
+func TestTopicSuggestRequiresDescription(t *testing.T) {
+	app := newTestApp(t, stubAI{suggestion: suggestionFixture})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/topics/suggest", url.Values{"seed": {"   "}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("empty seed = %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "what you are studying") {
+		t.Errorf("no prompt for a description; body: %.300s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "filled in") {
+		t.Error("AI was called despite an empty description")
+	}
+}
+
+// A suggestion is optional sugar: when Claude is unreachable the form must come
+// back usable, with the failure as a bubble at 200 rather than an error page.
+func TestTopicSuggestRendersAIFailureAsBubble(t *testing.T) {
+	// A server with no key must say so, not "try again" — the distinction is
+	// the difference between a fixable setup problem and a transient one.
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{claude.ErrBadAuth, "API key was rejected"},
+		{claude.ErrNotConfigured, "no Claude API key"},
+		{claude.ErrRateLimited, "rate-limited"},
+	}
+	for _, c := range cases {
+		app := newTestApp(t, stubAI{err: c.err})
+		app.login("t@example.com")
+
+		w := app.do("POST", "/topics/suggest", url.Values{"seed": {"chess openings"}})
+		if w.Code != http.StatusOK {
+			t.Fatalf("%v = %d, want 200", c.err, w.Code)
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, c.want) {
+			t.Errorf("%v: missing copy %q; body: %.300s", c.err, c.want, body)
+		}
+		if !strings.Contains(body, `name="name"`) {
+			t.Errorf("%v: form fields not re-rendered after the failure", c.err)
+		}
+	}
+}
+
+// The disclosure is only worth hiding if it opens when it holds something: a
+// blank new-topic form collapses, an existing topic's settings do not.
+func TestTopicFormDisclosureOpensWhenItHasContent(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("GET", "/topics/new", nil)
+	if strings.Contains(w.Body.String(), `class="disclosure" open`) {
+		t.Error("blank new-topic form opened the optional settings")
+	}
+	// Placeholders must show the prompt builder's real fallbacks.
+	for _, def := range []string{claude.PromptDefaults.Expertise, claude.PromptDefaults.ContextType} {
+		if !strings.Contains(w.Body.String(), `placeholder="`+def+`"`) {
+			t.Errorf("default %q not shown as a placeholder", def)
+		}
+	}
+
+	ctx := context.Background()
+	u, _, _ := app.store.GetUserByEmail(ctx, "t@example.com")
+	expertise := "language tutor"
+	topic, err := app.store.CreateTopic(ctx, u.ID, store.TopicParams{Name: "Spanish", Expertise: &expertise})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w = app.do("GET", "/topics/"+itoa(topic.ID)+"/edit", nil)
+	if !strings.Contains(w.Body.String(), `class="disclosure" open`) {
+		t.Error("topic with settings did not open the optional settings")
+	}
+	if !strings.Contains(w.Body.String(), expertise) {
+		t.Error("stored expertise not rendered into the edit form")
 	}
 }

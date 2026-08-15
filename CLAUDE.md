@@ -93,12 +93,23 @@ and HTMX swapping fragments.
   mirror `rate-limiter.ts` — keep them in sync conceptually.
 - `internal/claude/` — `anthropic-sdk-go` client (`client.go`), prompt builders ported verbatim from
   `prompts/study-assistance.ts` (`prompts.go`), and the three operations (`study.go`):
-  GenerateQuestion (extracts `<question>` tag), ChatAboutQuestion, ChatAboutTopic. Card content is
+  GenerateQuestion (extracts `<question>` tag), ChatAboutQuestion, ChatAboutTopic. `suggest.go` adds
+  a fourth, **Go-only** operation (no Svelte counterpart): SuggestTopicConfig proposes a topic's
+  seven prompt fields from a one-line description, so `POST /topics/suggest` can fill the topic
+  form's *blank* inputs (never overwriting typed ones) by re-rendering the `topic_form_fields`
+  partial. Its instructions **quote the identity sentence `GeneratePrompts` builds** — that is what
+  keeps a suggestion grammatical in the slot it lands in, so changing the template means changing
+  the quote (`TestSuggestInstructionsQuoteTheRealTemplate` guards it). Blank fields fall back to
+  `claude.PromptDefaults`, which the form shows as input placeholders. Card content is
   always fetched **server-side by scheduleId** — the browser never supplies prompt text. Prompts
   carry `cache_control` breakpoints at stable-prefix boundaries (max 4 per request — count them
   when adding one); question generation routes to `CLAUDE_QUESTION_MODEL`/`_EFFORT` when set; API
   failures map to typed sentinels (`ErrRateLimited`/`ErrOverloaded`/`ErrBadAuth`/`ErrRefused`)
-  that `internal/server/ai_errors.go` turns into distinct error-bubble copy at HTTP 200.
+  that `internal/server/ai_errors.go` turns into distinct error-bubble copy at HTTP 200. A client
+  built without `CLAUDE_API_KEY` short-circuits **before** the request with `ErrNotConfigured`:
+  otherwise the SDK spends a round-trip on its own credential discovery and fails with a local
+  error carrying no HTTP status, which `classifyAPIError` cannot recognise — so every AI feature
+  would report a generic "try again" for a condition retrying can never fix.
 - `internal/pregen/` — nightly Message Batches job pre-generating questions for cards due within
   24h (`generated_questions` table, consumed on serve, invalidated on card edit/reset).
   Deliberately **not** on the `server.AI` interface — handlers never batch, so handler tests stay

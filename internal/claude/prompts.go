@@ -21,6 +21,23 @@ type TopicConfig struct {
 	Question    string
 }
 
+// Defaults are the fallbacks NewTopicConfig substitutes for blank topic fields.
+type Defaults struct {
+	Expertise   string
+	Focus       string
+	ContextType string
+}
+
+// PromptDefaults holds those fallbacks in one place so the topic form can show
+// them as input placeholders: an empty field then says exactly what the prompt
+// will use if it stays empty, instead of hiding it. TopicDesc is absent because
+// its fallback is the topic's own name, which is not a fixed string.
+var PromptDefaults = Defaults{
+	Expertise:   "tutor",
+	Focus:       "concepts and principles",
+	ContextType: "additional context",
+}
+
 // orDefault returns the pointed-to string or fallback when nil/empty.
 func orDefault(p *string, fallback string) string {
 	if p != nil && *p != "" {
@@ -34,9 +51,9 @@ func NewTopicConfig(name string, description, expertise, focus, contextType, exa
 	return TopicConfig{
 		Topic:       name,
 		TopicDesc:   orDefault(description, name),
-		Expertise:   orDefault(expertise, "tutor"),
-		Focus:       orDefault(focus, "concepts and principles"),
-		ContextType: orDefault(contextType, "additional context"),
+		Expertise:   orDefault(expertise, PromptDefaults.Expertise),
+		Focus:       orDefault(focus, PromptDefaults.Focus),
+		ContextType: orDefault(contextType, PromptDefaults.ContextType),
 		Example:     orDefault(example, ""),
 		Question:    orDefault(question, ""),
 	}
