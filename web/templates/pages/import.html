@@ -20,6 +20,21 @@
           hx-disabled-elt="find button" hx-indicator="#import-spinner">
       <div class="field">
         <label class="label" for="f-yaml">YAML Content</label>
+        {{/* The picker reads the file into the textarea below rather than
+             uploading it: the form stays a plain urlencoded POST, the format
+             hint fires exactly as it does for a paste, and you can see and
+             edit what you picked before importing. The input carries no name
+             attribute, so nothing extra is submitted. */}}
+        <div class="file-row">
+          {{/* The input is nested rather than linked with for=, which would
+               make a label click open the picker twice in some browsers. */}}
+          <label class="btn btn-secondary btn-file">
+            {{template "icon-upload"}} Choose File…
+            <input type="file" id="f-file" class="sr-only" accept=".yaml,.yml,text/yaml"
+                   data-file-into="#f-yaml">
+          </label>
+          <span class="file-name" data-file-name>or paste below</span>
+        </div>
         {{/* The hint is rendered server-side by POST /import/detect so it runs
              the same parsers as the import itself. Debounced, and "changed"
              keeps a re-render from firing on arrow keys. */}}
@@ -27,8 +42,8 @@
                   hx-post="/import/detect" hx-trigger="input changed delay:400ms"
                   hx-target="#import-detect" hx-swap="innerHTML"
                   placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
-        <p class="field-help">Paste an export from Cadence Cards, with or without the metadata
-          header. The format is detected automatically.</p>
+        <p class="field-help">Choose a <code>.yaml</code> file or paste an export from Cadence Cards,
+          with or without the metadata header. The format is detected automatically.</p>
       </div>
 
       <div id="import-detect"></div>

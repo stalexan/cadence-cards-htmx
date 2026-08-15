@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -361,11 +360,15 @@ func TestImportDetect(t *testing.T) {
 
 	// A real topic export, fetched from the export endpoint rather than
 	// hand-written, so the hint is tested against bytes the app produces.
-	topics, err := app.store.ListTopics(context.Background(), userIDForEmail(t, app, "t@example.com"))
+	u, _, err := app.store.GetUserByEmail(context.Background(), "t@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
-	exp := app.do("GET", "/topics/"+strconv.FormatInt(topics[0].ID, 10)+"/export?includeDecks=true", nil)
+	topics, err := app.store.ListTopics(context.Background(), u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := app.do("GET", "/topics/"+itoa(topics[0].ID)+"/export?includeDecks=true", nil)
 	if exp.Code != http.StatusOK {
 		t.Fatalf("export status = %d", exp.Code)
 	}
@@ -450,11 +453,27 @@ func TestImportDetectRequiresAuth(t *testing.T) {
 	}
 }
 
-func userIDForEmail(t *testing.T, app *testApp, email string) int64 {
-	t.Helper()
-	u, _, err := app.store.GetUserByEmail(context.Background(), email)
-	if err != nil {
-		t.Fatal(err)
+// The file picker is client-side (app.js reads the file into the textarea), so
+// the only thing the server can guarantee is that the wiring attributes ship.
+// Without them the button renders and silently does nothing.
+func TestImportPageOffersFilePicker(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	body := app.do("GET", "/import", nil).Body.String()
+	for _, want := range []string{
+		`type="file"`,
+		`data-file-into="#f-yaml"`, // names the textarea app.js fills
+		`accept=".yaml,.yml,text/yaml"`,
+		`data-file-name`, // the "which file did I pick" readout
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("import page missing %q", want)
+		}
 	}
-	return u.ID
+	// A named file input would be submitted alongside the textarea and force
+	// the form to multipart, which the handler does not parse.
+	if strings.Contains(body, `type="file" name=`) || strings.Contains(body, `name="file"`) {
+		t.Error("file input must not carry a name attribute")
+	}
 }

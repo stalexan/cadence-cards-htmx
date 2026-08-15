@@ -109,7 +109,8 @@ view you're looking at is a link you can share or bookmark:
   download it as `<deck_name>_cards.yaml`.
 - **Export a whole topic** — its Claude configuration and, optionally, every deck and card it owns —
   as `<topic_name>_topic.yaml`. Leave the decks toggle off for a configuration-only file.
-- **Import** by pasting YAML (1 MB limit) on the single **Import** page. The format is detected
+- **Import** by choosing a `.yaml` file or pasting YAML (1 MB limit) on the single **Import** page.
+  A chosen file is read into the text box, so you can see and edit it before importing. The format is detected
   automatically: a list of cards goes into the deck you pick, a topic export creates a new topic with
   its own decks. The metadata header is optional either way.
 - **The page tells you what you pasted** before you submit — "Topic export detected: Spanish, 2 decks,

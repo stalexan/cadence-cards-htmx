@@ -699,6 +699,20 @@ a:hover .entity-title { color: var(--indigo-600); }
 }
 /* Help text sits below the control as `mt-1 text-xs text-gray-500`. */
 .field-help { font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--gray-500); }
+/* File picker: a .btn label wrapping an .sr-only input, so it inherits the
+   button styling the native control cannot take. The input is hidden from
+   sight but not from the a11y tree, and focus-within puts the ring on the
+   label since the ring would otherwise land on an invisible element. */
+.file-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.btn-file { position: relative; }
+.btn-file:focus-within { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
+.file-name {
+  font-size: var(--text-sm); line-height: var(--leading-sm);
+  color: var(--gray-500); min-width: 0; overflow-wrap: anywhere;
+}
 .input {
   font-family: inherit; font-size: var(--text-base); padding: var(--space-2);
   border: 1px solid var(--gray-300); border-radius: var(--radius-md);

@@ -145,6 +145,38 @@
     link.href = params.length ? base + "?" + params.join("&") : base;
   });
 
+  // ----- File picker that fills a textarea (import page) -----
+  // Reads the file in the browser instead of uploading it, so the form stays
+  // a plain urlencoded POST and the pasted-vs-picked paths are the same code
+  // on the server. Dispatching "input" is what makes htmx's detect trigger
+  // fire, exactly as typing would.
+  document.addEventListener("change", function (e) {
+    var picker = e.target.closest("[data-file-into]");
+    if (!picker || !picker.files || !picker.files.length) return;
+    var target = document.querySelector(picker.getAttribute("data-file-into"));
+    if (!target) return;
+    var file = picker.files[0];
+    var name = picker.closest(".file-row");
+    name = name && name.querySelector("[data-file-name]");
+    // The server enforces the real 1 MB limit; this only avoids loading a
+    // hopeless file into the DOM to be rejected a moment later.
+    if (file.size > 1048576) {
+      if (name) name.textContent = file.name + " is larger than the 1 MB limit";
+      picker.value = "";
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      target.value = reader.result;
+      if (name) name.textContent = file.name;
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    reader.onerror = function () {
+      if (name) name.textContent = "Could not read " + file.name;
+    };
+    reader.readAsText(file);
+  });
+
   // ----- Import page: react to the server's format hint -----
   // The detection itself is server-side (POST /import/detect runs the same
   // parsers as the import), so this only reads the verdict off the swapped
