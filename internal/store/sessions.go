@@ -66,6 +66,13 @@ func (s *Store) DeleteOtherSessions(ctx context.Context, userID int64, keepToken
 	return err
 }
 
+// DeleteUserSessions removes every session a user has (CLI password reset,
+// which has no session of its own to keep).
+func (s *Store) DeleteUserSessions(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	return err
+}
+
 // DeleteExpiredSessions clears expired sessions (hourly ticker).
 func (s *Store) DeleteExpiredSessions(ctx context.Context, now time.Time) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, fmtTime(now))

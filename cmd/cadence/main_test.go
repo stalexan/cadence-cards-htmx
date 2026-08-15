@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -123,5 +126,138 @@ func TestRunCreateUserMultiWordName(t *testing.T) {
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte("super secret password")) != nil {
 		t.Error("stored hash does not match the piped password")
+	}
+}
+
+func TestRunListUsers(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "users.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+
+	var empty bytes.Buffer
+	if err := runListUsers(ctx, st, &empty); err != nil {
+		t.Fatalf("runListUsers (empty): %v", err)
+	}
+	if got := empty.String(); got != "No users.\n" {
+		t.Errorf("empty database printed %q, want %q", got, "No users.\n")
+	}
+
+	if _, err := st.CreateUser(ctx, "Sean Alexandre", "sean@example.com", "hash-one"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if _, err := st.CreateUser(ctx, "", "second@example.com", "hash-two"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := runListUsers(ctx, st, &out); err != nil {
+		t.Fatalf("runListUsers: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines, want a header plus 2 users:\n%s", len(lines), out.String())
+	}
+	for _, want := range []string{"sean@example.com", "Sean Alexandre", "second@example.com"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output is missing %q:\n%s", want, out.String())
+		}
+	}
+	// A listing must never leak password hashes.
+	if strings.Contains(out.String(), "hash-one") {
+		t.Errorf("output contains the password hash:\n%s", out.String())
+	}
+}
+
+// pipeStdin replaces os.Stdin with a pipe holding text for the duration of the
+// test.
+func pipeStdin(t *testing.T, text string) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString(text); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() { os.Stdin = oldStdin })
+}
+
+func TestRunResetPassword(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "users.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+
+	old, err := bcrypt.GenerateFromPassword([]byte("old password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := st.CreateUser(ctx, "Sean", "sean@example.com", string(old))
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := st.CreateSession(ctx, user.ID, time.Now())
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	pipeStdin(t, "brand new password\n")
+	if err := runResetPassword(st, "sean@example.com"); err != nil {
+		t.Fatalf("runResetPassword: %v", err)
+	}
+
+	_, hash, err := st.GetUserByEmail(ctx, "sean@example.com")
+	if err != nil {
+		t.Fatalf("GetUserByEmail: %v", err)
+	}
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte("brand new password")) != nil {
+		t.Error("stored hash does not match the piped password")
+	}
+	// The reset signs every existing session out.
+	if _, err := st.GetSessionUser(ctx, token, time.Now()); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("session after reset: err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestRunResetPasswordUnknownEmail(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "users.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+
+	pipeStdin(t, "brand new password\n")
+	if err := runResetPassword(st, "nobody@example.com"); err == nil {
+		t.Fatal("runResetPassword on an unknown email: got nil, want error")
+	}
+}
+
+func TestRunResetPasswordTooShort(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "users.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+	if _, err := st.CreateUser(ctx, "Sean", "sean@example.com", "old-hash"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	pipeStdin(t, "short\n")
+	if err := runResetPassword(st, "sean@example.com"); err == nil {
+		t.Fatal("runResetPassword with a 5-char password: got nil, want error")
+	}
+	if _, hash, err := st.GetUserByEmail(ctx, "sean@example.com"); err != nil {
+		t.Fatalf("GetUserByEmail: %v", err)
+	} else if hash != "old-hash" {
+		t.Errorf("hash = %q, want the original to be untouched", hash)
 	}
 }

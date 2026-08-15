@@ -46,6 +46,32 @@ func scanUser(row *sql.Row) (User, string, error) {
 	return u, hash.String, nil
 }
 
+// ListUsers returns every account, oldest first (the -list-users CLI).
+func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, email, created_at FROM users ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var name, email sql.NullString
+		var created string
+		if err := rows.Scan(&u.ID, &name, &email, &created); err != nil {
+			return nil, err
+		}
+		u.Name, u.Email = nullStr(name), nullStr(email)
+		if u.CreatedAt, err = parseTime(created); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 // GetUserByID fetches a user by ID.
 func (s *Store) GetUserByID(ctx context.Context, id int64) (User, error) {
 	u, _, err := scanUser(s.db.QueryRowContext(ctx,

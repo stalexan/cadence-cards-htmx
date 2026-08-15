@@ -26,6 +26,12 @@ DB_PATH=./dev.db COOKIE_SECURE=false ENABLE_PUBLIC_REGISTRATION=true \
 # Create a user when public registration is off (prompts for name/password)
 go run ./cmd/cadence -create-user you@example.com
 
+# Reset a forgotten password (prompts; signs that user out everywhere)
+go run ./cmd/cadence -reset-password you@example.com
+
+# List the accounts in the database
+go run ./cmd/cadence -list-users
+
 # Container (final image is ubuntu:resolute; unit tests run inside the build)
 docker compose up -d --build
 ```
@@ -56,7 +62,7 @@ and HTMX swapping fragments.
   `git describe` is unavailable at build time (`.git` is `.dockerignore`d). See `docs/VERSIONING.md`.
 - `cmd/cadence/` — wiring only: config → store/migrations → server → graceful shutdown; hourly
   maintenance ticker (session/conversation cleanup, rate-limiter pruning, and the nightly question
-  pre-generation batch via `internal/pregen`); `-version`, `-create-user`, and `-backup` CLI. `-version` is handled before
+  pre-generation batch via `internal/pregen`); `-version`, `-create-user`, `-reset-password`, `-list-users`, and `-backup` CLI. `-version` is handled before
   the logger, `config.Load`, and `store.Open`, so it works with a broken env and never migrates.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
   `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports

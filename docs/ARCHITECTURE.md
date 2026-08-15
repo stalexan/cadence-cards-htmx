@@ -108,7 +108,7 @@ SIGINT/SIGTERM. Two details are deliberate rather than incidental:
   `config.Load` and `store.Open`, so asking a binary its version prints one bare line, works with
   a broken environment, and never migrates a database. `-backup` returns after `config.Load` (it
   needs `DB_PATH`) but still before `store.Open`, because a snapshot must not migrate either.
-  `-create-user` is the one that does open the store.
+  `-create-user`, `-reset-password` and `-list-users` are the ones that do open the store.
 - **An hourly maintenance ticker** deletes expired sessions and stale rate-limiter entries. It is
   the only background goroutine in the app; a cancelled context stops it during shutdown.
 

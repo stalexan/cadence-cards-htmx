@@ -73,6 +73,35 @@ func TestUserCRUDAndDuplicates(t *testing.T) {
 	}
 }
 
+func TestListUsers(t *testing.T) {
+	s := newTestStore(t)
+	if users, err := s.ListUsers(ctx); err != nil || len(users) != 0 {
+		t.Fatalf("ListUsers on an empty database = (%v, %v)", users, err)
+	}
+	first, err := s.CreateUser(ctx, "Sean", "sean@example.com", "h1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CreateUser(ctx, "Other", "other@example.com", "h2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(users) != 2 || users[0].ID != first.ID || users[1].ID != second.ID {
+		t.Fatalf("ListUsers = %+v, want ids [%d %d] in order", users, first.ID, second.ID)
+	}
+	if users[0].Email == nil || *users[0].Email != "sean@example.com" {
+		t.Errorf("email = %v, want sean@example.com", users[0].Email)
+	}
+	if users[0].CreatedAt.IsZero() {
+		t.Error("CreatedAt is zero")
+	}
+}
+
 func TestTopicUniquePerUser(t *testing.T) {
 	s := newTestStore(t)
 	userID, _, _ := seed(t, s, false)

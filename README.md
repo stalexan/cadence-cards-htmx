@@ -250,6 +250,19 @@ prompts for a name and password):
 go run ./cmd/cadence -create-user you@example.com
 ```
 
+Forgotten password? The profile page needs the current one, so reset it from the CLI instead (this
+also signs the user out everywhere):
+
+```bash
+go run ./cmd/cadence -reset-password you@example.com
+```
+
+To see which accounts exist (id, email, name, creation date — never password hashes):
+
+```bash
+go run ./cmd/cadence -list-users
+```
+
 ## Configuration
 
 All configuration is environment variables, and none of them are strictly required. `.env.example`
@@ -334,6 +347,14 @@ With public registration off (the default), create the account from the containe
 
 ```bash
 docker compose run --rm app -create-user you@example.com
+```
+
+Same for a forgotten password, and for listing the accounts (`exec` on the running container works
+too):
+
+```bash
+docker compose run --rm app -reset-password you@example.com
+docker compose run --rm app -list-users
 ```
 
 To check which release an image contains, without starting the server or touching the database:
@@ -430,7 +451,7 @@ enough; inline variables remain handy for one-off overrides (`CLAUDE_MAX_TOKENS=
 
 ```
 VERSION               release number, embedded into the binary by version.go
-cmd/cadence/          entrypoint (+ -version, -create-user and -backup CLI)
+cmd/cadence/          entrypoint (+ -version, -create-user, -reset-password, -list-users, -backup CLI)
 internal/config/      env configuration
 internal/sm2/         SM-2 algorithm (pure, with its tests)
 internal/yamlio/      YAML export/import

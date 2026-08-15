@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -32,6 +33,8 @@ import (
 func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	createUser := flag.String("create-user", "", "create a user with the given email (prompts for password) and exit")
+	resetPassword := flag.String("reset-password", "", "set a new password for the user with the given email (prompts for password) and exit")
+	listUsers := flag.Bool("list-users", false, "print the accounts in the database and exit")
 	backupPath := flag.String("backup", "", `write a consistent snapshot of the database to this path ("-" for stdout) and exit`)
 	flag.Parse()
 
@@ -75,6 +78,20 @@ func main() {
 	if *createUser != "" {
 		if err := runCreateUser(st, *createUser); err != nil {
 			fatal("create user", err)
+		}
+		return
+	}
+
+	if *resetPassword != "" {
+		if err := runResetPassword(st, *resetPassword); err != nil {
+			fatal("reset password", err)
+		}
+		return
+	}
+
+	if *listUsers {
+		if err := runListUsers(context.Background(), st, os.Stdout); err != nil {
+			fatal("list users", err)
 		}
 		return
 	}
@@ -252,28 +269,93 @@ func runCreateUser(st *store.Store, email string) error {
 		return errors.New("name is required")
 	}
 
-	fmt.Print("Password (min 8 chars): ")
-	password, err := readPassword(in)
+	hash, err := promptPasswordHash(in, "Password (min 8 chars): ")
 	if err != nil {
 		return err
 	}
-	if len(password) < 8 {
-		return errors.New("password must be at least 8 characters")
-	}
-	if len(password) > 72 {
-		return errors.New("password must be at most 72 bytes (bcrypt limit)")
-	}
-
-	hash, err := bcrypt.GenerateFromPassword(password, 12)
-	if err != nil {
-		return err
-	}
-	user, err := st.CreateUser(context.Background(), name, email, string(hash))
+	user, err := st.CreateUser(context.Background(), name, email, hash)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Created user %d (%s)\n", user.ID, email)
 	return nil
+}
+
+// runResetPassword sets a new password for an existing account, for when
+// nobody can reach the profile page's change-password form (which requires the
+// current password). Every session of that user is dropped: the CLI has none of
+// its own to keep, and a reset means the old ones are no longer trusted.
+func runResetPassword(st *store.Store, email string) error {
+	ctx := context.Background()
+	user, _, err := st.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("no user with email %q", email)
+		}
+		return err
+	}
+
+	hash, err := promptPasswordHash(bufio.NewReader(os.Stdin), "New password (min 8 chars): ")
+	if err != nil {
+		return err
+	}
+	if err := st.UpdatePassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+	if err := st.DeleteUserSessions(ctx, user.ID); err != nil {
+		return err
+	}
+	fmt.Printf("Password reset for user %d (%s); all sessions signed out\n", user.ID, email)
+	return nil
+}
+
+// runListUsers prints the accounts in the database, so you know which email to
+// hand to -reset-password. Deliberately never prints the password hash.
+func runListUsers(ctx context.Context, st *store.Store, out io.Writer) error {
+	users, err := st.ListUsers(ctx)
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 {
+		fmt.Fprintln(out, "No users.")
+		return nil
+	}
+
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tEMAIL\tNAME\tCREATED")
+	for _, u := range users {
+		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n",
+			u.ID, deref(u.Email), deref(u.Name), u.CreatedAt.Local().Format("2006-01-02"))
+	}
+	return tw.Flush()
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// promptPasswordHash reads a password, validates its length and bcrypt-hashes
+// it. The 72-byte ceiling is bcrypt's: longer input is silently truncated.
+func promptPasswordHash(in *bufio.Reader, prompt string) (string, error) {
+	fmt.Print(prompt)
+	password, err := readPassword(in)
+	if err != nil {
+		return "", err
+	}
+	if len(password) < 8 {
+		return "", errors.New("password must be at least 8 characters")
+	}
+	if len(password) > 72 {
+		return "", errors.New("password must be at most 72 bytes (bcrypt limit)")
+	}
+	hash, err := bcrypt.GenerateFromPassword(password, 12)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
 // readLine reads one full line, accepting an unterminated final line (EOF).
