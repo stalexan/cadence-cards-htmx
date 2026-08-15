@@ -82,6 +82,9 @@ and HTMX swapping fragments.
   evolve. Its per-deck card blocks are built by the shared `cardNodes`/`decodeCard`, so they stay
   identical to the deck format; `TestTopicCardBlockMatchesDeckFormat` is the guard. A deck file is a
   sequence and a topic file is a mapping, which is what `Detect` keys on to route `POST /import`.
+  The import page's live "what did I paste?" hint goes through `POST /import/detect`, which runs the
+  *same* `Detect` and parsers — never re-sniff the format in `app.js`, or the hint will drift from
+  what the import actually does.
 - `internal/store/` — **all SQL lives here**, one file per aggregate.  Migrations are embedded
   `.sql` files in `store/migrations/`, applied in filename order and tracked in `schema_migrations`
   (forward-only; add `0002_*.sql` etc., never edit an applied migration).

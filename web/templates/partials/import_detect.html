@@ -1,0 +1,19 @@
+{{/* Live format hint for the import page, swapped into #import-detect as the
+     user types or pastes. Context: importDetectData.
+
+     data-import-format is read by app.js to show or hide the target-deck field
+     and relabel the submit button; an empty Format (empty textarea) renders no
+     alert at all, which restores the field. Keep the attribute on the outer
+     div — the listener reads it off the swap target's first child. */}}
+{{define "import_detect"}}
+<div data-import-format="{{.Format}}">
+  {{if .Summary}}
+  <div class="alert alert-compact {{if .Problem}}alert-warning{{else}}alert-success{{end}}">
+    {{if .Problem}}{{template "icon-alert-circle"}}{{else}}{{template "icon-check-circle"}}{{end}}
+    <div class="alert-body">
+      <span class="alert-title">{{.Summary}}</span>{{if .Detail}} <span class="alert-text">{{.Detail}}</span>{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

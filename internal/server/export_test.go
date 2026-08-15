@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -347,4 +348,113 @@ func TestSanitizeFilename(t *testing.T) {
 			t.Errorf("sanitizeFilename(%q) = %q, want %q", in, got, want)
 		}
 	}
+}
+
+// ---------- Import format detection ----------
+
+// The hint is what tells the user whether the target-deck field applies, so it
+// has to agree with what POST /import would actually do with the same bytes.
+func TestImportDetect(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seed(false)
+
+	// A real topic export, fetched from the export endpoint rather than
+	// hand-written, so the hint is tested against bytes the app produces.
+	topics, err := app.store.ListTopics(context.Background(), userIDForEmail(t, app, "t@example.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := app.do("GET", "/topics/"+strconv.FormatInt(topics[0].ID, 10)+"/export?includeDecks=true", nil)
+	if exp.Code != http.StatusOK {
+		t.Fatalf("export status = %d", exp.Code)
+	}
+
+	cases := []struct {
+		name    string
+		yaml    string
+		format  string
+		wantAll []string
+	}{
+		{
+			name:    "topic export",
+			yaml:    exp.Body.String(),
+			format:  "topic",
+			wantAll: []string{"Topic export detected", "Spanish", "1 deck", "1 card"},
+		},
+		{
+			name:    "config-only topic",
+			yaml:    "Topic:\n  Name: Spanish\n",
+			format:  "topic",
+			wantAll: []string{"Topic export detected", "Settings only"},
+		},
+		{
+			name:    "card list",
+			yaml:    "- Front: hola\n  Back: hello\n  Priority: A\n- Front: adios\n  Back: bye\n  Priority: B\n",
+			format:  "cards",
+			wantAll: []string{"Card list detected", "2 cards ready"},
+		},
+		{
+			name:    "garbage",
+			yaml:    "just some prose, not yaml at all: [",
+			format:  "unknown",
+			wantAll: []string{"does not look like"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w := app.do("POST", "/import/detect", url.Values{"yamlContent": {c.yaml}})
+			// Always 200: the hint is advisory, and htmx would discard the
+			// body on most error statuses anyway.
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, body: %s", w.Code, w.Body.String())
+			}
+			body := w.Body.String()
+			if !strings.Contains(body, `data-import-format="`+c.format+`"`) {
+				t.Errorf("want format %q, got: %s", c.format, body)
+			}
+			for _, want := range c.wantAll {
+				if !strings.Contains(body, want) {
+					t.Errorf("missing %q in: %s", want, body)
+				}
+			}
+		})
+	}
+}
+
+// An empty box renders an empty verdict, which is what restores the deck field
+// after the user clears the textarea.
+func TestImportDetectEmpty(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("POST", "/import/detect", url.Values{"yamlContent": {"   \n  "}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `data-import-format=""`) {
+		t.Errorf("want empty format, got: %s", body)
+	}
+	if strings.Contains(body, "alert") {
+		t.Errorf("empty input should render no alert: %s", body)
+	}
+}
+
+// Detection is behind auth like every other import route.
+func TestImportDetectRequiresAuth(t *testing.T) {
+	app := newTestApp(t, nil)
+	w := app.do("POST", "/import/detect", url.Values{"yamlContent": {"Topic:\n  Name: X\n"}})
+	if w.Code != http.StatusSeeOther {
+		t.Errorf("status = %d, want redirect to login", w.Code)
+	}
+}
+
+func userIDForEmail(t *testing.T, app *testApp, email string) int64 {
+	t.Helper()
+	u, _, err := app.store.GetUserByEmail(context.Background(), email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.ID
 }

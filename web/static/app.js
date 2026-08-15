@@ -145,6 +145,26 @@
     link.href = params.length ? base + "?" + params.join("&") : base;
   });
 
+  // ----- Import page: react to the server's format hint -----
+  // The detection itself is server-side (POST /import/detect runs the same
+  // parsers as the import), so this only reads the verdict off the swapped
+  // fragment: a topic export creates its own decks, so the target-deck field
+  // is irrelevant and hidden. Purely cosmetic — the server ignores deckId for
+  // a topic file either way, so a stale hint cannot cause a wrong import.
+  function applyImportFormat(root) {
+    var hint = root.querySelector("[data-import-format]");
+    if (!hint) return;
+    var isTopic = hint.getAttribute("data-import-format") === "topic";
+    document.querySelectorAll("[data-import-deck-field]").forEach(function (field) {
+      field.hidden = isTopic;
+    });
+    var label = document.querySelector("[data-import-submit-label]");
+    if (label) label.textContent = isTopic ? "Import Topic" : "Import";
+  }
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target && e.target.id === "import-detect") applyImportFormat(e.target);
+  });
+
   // ----- Tag chips (card forms) -----
   function renderChips(wrap) {
     var hidden = wrap.querySelector('input[type="hidden"][name="tags"]');

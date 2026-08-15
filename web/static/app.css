@@ -390,6 +390,10 @@ dialog { border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow
 /* Back link and standalone page title both sit on the mb-6 rhythm. */
 .back-link-row { margin-bottom: var(--space-6); }
 .page-title { margin-bottom: var(--space-6); }
+/* A title carrying a subtitle hands its bottom margin to the subtitle, so the
+   pair reads as one block and the rhythm below is unchanged. */
+.page-title.has-sub { margin-bottom: var(--space-2); }
+.page-sub { margin-bottom: var(--space-6); color: var(--gray-600); }
 .no-match { padding: var(--space-6) 0; text-align: center; color: var(--gray-500); }
 .grid-cards { display: grid; grid-template-columns: 1fr; gap: var(--space-6); }
 .grid-stats { display: grid; grid-template-columns: 1fr; gap: var(--space-6); }

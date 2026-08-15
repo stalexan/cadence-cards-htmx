@@ -116,6 +116,7 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 
 	mux.HandleFunc("GET /import", auth(s.handleImportPage))
 	mux.HandleFunc("POST /import", auth(s.handleImport))
+	mux.HandleFunc("POST /import/detect", auth(s.handleImportDetect))
 
 	mux.HandleFunc("GET /profile", auth(s.handleProfilePage))
 	mux.HandleFunc("POST /profile", auth(s.handleProfileUpdate))

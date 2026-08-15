@@ -4,38 +4,56 @@
 <div class="back-link-row">
   <a class="back-link" href="/dashboard">{{template "icon-arrow-left"}}Back to Dashboard</a>
 </div>
-<h1 class="page-title">Import Cards</h1>
+<h1 class="page-title has-sub">Import</h1>
+<p class="page-sub">Paste a card list to add cards to an existing deck, or a topic export to
+  create a new topic with its decks and cards.</p>
 
 <div class="panel form-card">
   <div class="panel-body">
     {{/* Result goes above the form, as in the reference — not below it. */}}
     <div id="import-result"></div>
     {{/* The form always renders: a topic export brings its own decks, so an
-         account with no decks can still import one. The deck select is only
-         needed for the card format. */}}
+         account with no decks can still import one. The YAML box comes first
+         because the file decides which kind of import this is — the target
+         deck is a follow-up question, and only for the card format. */}}
     <form class="stack" hx-post="/import" hx-target="#import-result" hx-swap="innerHTML"
           hx-disabled-elt="find button" hx-indicator="#import-spinner">
       <div class="field">
+        <label class="label" for="f-yaml">YAML Content</label>
+        {{/* The hint is rendered server-side by POST /import/detect so it runs
+             the same parsers as the import itself. Debounced, and "changed"
+             keeps a re-render from firing on arrow keys. */}}
+        <textarea class="input mono" id="f-yaml" name="yamlContent" rows="15" required
+                  hx-post="/import/detect" hx-trigger="input changed delay:400ms"
+                  hx-target="#import-detect" hx-swap="innerHTML"
+                  placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
+        <p class="field-help">Paste an export from Cadence Cards, with or without the metadata
+          header. The format is detected automatically.</p>
+      </div>
+
+      <div id="import-detect"></div>
+
+      {{/* Hidden by app.js while a topic export is in the box — a topic file
+           creates its own decks, so the question does not apply. */}}
+      <div class="field" data-import-deck-field>
         <label class="label" for="f-deck">Target Deck</label>
         <select class="input select" id="f-deck" name="deckId">
           <option value="">Select a deck…</option>
           {{range $d.Decks}}<option value="{{.ID}}">{{.TopicName}} / {{.Name}}</option>{{end}}
         </select>
         {{if $d.Decks}}
-        <p class="field-help">Required when importing a list of cards; ignored for a topic export, which creates its own decks.</p>
+        <p class="field-help">Where the pasted cards should go. Required for a card list.</p>
         {{else}}
-        <p class="field-help">You have no decks yet. You can still import a topic export, which creates its own decks — or <a class="entity-link" href="/decks/new">create a deck</a> first to import a card list.</p>
+        <p class="field-help">You have no decks yet. You can still import a topic export, which
+          creates its own decks — or <a class="entity-link" href="/decks/new">create a deck</a>
+          first to import a card list.</p>
         {{end}}
       </div>
-      <div class="field">
-        <label class="label" for="f-yaml">YAML Content</label>
-        <textarea class="input mono" id="f-yaml" name="yamlContent" rows="15" required
-                  placeholder="- Front: hola&#10;  Back: hello&#10;  Priority: A"></textarea>
-        <p class="field-help">Paste a card list or a topic export from Cadence Cards, with or without the metadata header. The format is detected automatically.</p>
-      </div>
+
       <div class="actions-end">
         <span id="import-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
-        <button type="submit" class="btn btn-primary">{{template "icon-upload"}} Import</button>
+        <button type="submit" class="btn btn-primary">{{template "icon-upload"}}
+          <span data-import-submit-label>Import</span></button>
       </div>
     </form>
   </div>

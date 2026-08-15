@@ -3,6 +3,8 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"cadence-cards/internal/sm2"
 	"cadence-cards/internal/store"
@@ -35,6 +37,105 @@ type importResultData struct {
 	TopicName    string
 	TopicRenamed bool
 	DeckCount    int
+}
+
+// importDetectData feeds the import_detect.html fragment: a live read of what
+// the user has pasted, so the page can say which kind of import this will be
+// before they submit.
+type importDetectData struct {
+	// Format is "topic", "cards", "unknown", or "" for an empty box. app.js
+	// keys the deck field's visibility off it, so it is the fragment's
+	// contract with the client as well as its rendering switch.
+	Format string
+	// Summary is the human sentence; Detail adds counts when we have them.
+	Summary string
+	Detail  string
+	// Problem renders the hint as a warning instead of a confirmation.
+	Problem bool
+}
+
+// handleImportDetect previews the format of the pasted YAML. It runs the same
+// yamlio.Detect and parsers the POST handler will run, rather than sniffing the
+// text in JavaScript, so the hint cannot disagree with the actual import.
+func (s *Server) handleImportDetect(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 3*maxImportSize+4096)
+	if err := r.ParseForm(); err != nil {
+		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+			Format: "unknown", Problem: true,
+			Summary: "That is more than the 1 MB import limit.",
+		})
+		return
+	}
+
+	content := r.FormValue("yamlContent")
+	if strings.TrimSpace(content) == "" {
+		// Empty box: render nothing and let the deck field come back.
+		s.fragment(w, http.StatusOK, "import_detect", importDetectData{})
+		return
+	}
+
+	switch yamlio.Detect(content) {
+	case yamlio.FormatTopic:
+		parsed, err := yamlio.ImportTopic(content)
+		if err != nil {
+			s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+				Format: "topic", Problem: true,
+				Summary: "This looks like a topic export, but it could not be read.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		cards := 0
+		for _, d := range parsed.Decks {
+			cards += len(d.Cards)
+		}
+		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+			Format:  "topic",
+			Summary: "Topic export detected: " + parsed.Config.Name,
+			Detail:  topicDetail(len(parsed.Decks), cards),
+		})
+	case yamlio.FormatCards:
+		valid, invalid, err := yamlio.Import(content)
+		if err != nil {
+			s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+				Format: "cards", Problem: true,
+				Summary: "This looks like a card list, but it could not be read.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		detail := plural(len(valid), "card", "cards") + " ready to import."
+		if len(invalid) > 0 {
+			detail += " " + plural(len(invalid), "card", "cards") + " will be skipped."
+		}
+		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+			Format:  "cards",
+			Summary: "Card list detected.",
+			Detail:  detail,
+		})
+	default:
+		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
+			Format: "unknown", Problem: true,
+			Summary: "This does not look like a card list or a topic export.",
+			Detail:  "A card list starts with “- Front:”; a topic export starts with “Topic:”.",
+		})
+	}
+}
+
+// topicDetail describes a topic file's contents, including the config-only case
+// (a topic exported with its decks left out).
+func topicDetail(decks, cards int) string {
+	if decks == 0 {
+		return "Settings only — no decks or cards in this file."
+	}
+	return plural(decks, "deck", "decks") + ", " + plural(cards, "card", "cards") + "."
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + many
 }
 
 func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
