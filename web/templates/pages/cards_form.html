@@ -5,7 +5,7 @@
 <div class="back-link-row">
   <a class="back-link" href="/cards">{{template "icon-arrow-left"}}Cards</a>
 </div>
-<div class="panel form-card">
+<div class="panel form-card form-card-wide">
   <div class="panel-body">
     <h1 class="h-form">New Card</h1>
     {{if $d.Error}}{{template "alert" (dict "Kind" "error" "Body" $d.Error)}}{{end}}
@@ -42,7 +42,7 @@
 
       <div class="field">
         <label class="label" for="f-note">Note</label>
-        <textarea class="input" id="f-note" name="note" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
+        <textarea class="input textarea-tall" id="f-note" name="note" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
         <p class="field-help">Optional extra context shown when the answer is revealed.</p>
       </div>
 

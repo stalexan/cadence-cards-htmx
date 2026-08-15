@@ -691,6 +691,9 @@ a:hover .entity-title { color: var(--indigo-600); }
 /* ---------- Forms ---------- */
 .stack { display: flex; flex-direction: column; gap: var(--space-6); }
 .form-card { max-width: 44rem; }
+/* Card entry gets more room than the other forms: its front/back pair sits
+   side by side, so 44rem leaves each column too narrow to read. */
+.form-card-wide { max-width: 60rem; }
 /* The .field gap IS the reference's `mb-1` between label and control. */
 .field { display: flex; flex-direction: column; gap: var(--space-1); }
 .label {
@@ -732,6 +735,10 @@ a:hover .entity-title { color: var(--indigo-600); }
    utility, so it renders no ring at all. Not worth matching. */
 .input:focus { outline: 2px solid var(--indigo-600); outline-offset: -1px; border-color: var(--indigo-600); }
 textarea.input { resize: vertical; min-height: 2.4rem; }
+/* A taller starting box for the note field. It has to be min-height, not
+   `rows`: app.js writes an explicit height on every [data-autoresize]
+   textarea, which would otherwise shrink an empty one back to one line. */
+textarea.textarea-tall { min-height: 7rem; }
 .select { appearance: auto; padding: var(--space-2) var(--space-3); }
 .check-field { display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; }
 .check-list { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); }
