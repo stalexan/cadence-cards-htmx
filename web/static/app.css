@@ -535,8 +535,12 @@ a:hover .entity-title { color: var(--indigo-600); }
   font-size: var(--text-sm); line-height: var(--leading-sm);
   font-weight: 500; color: var(--gray-500);
 }
-.content-card p, .note-card p {
-  margin-top: var(--space-1); white-space: pre-wrap;
+/* Card content is rendered markdown in a .card-md block, not a bare <p>, so
+   these target the block. No white-space: pre-wrap — markdown has already
+   decided where the line breaks go, and pre-wrap would re-honour the source's
+   soft wraps on top of that. */
+.content-card .card-md, .note-card .card-md {
+  margin-top: var(--space-1);
   font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--gray-900);
 }
 .note-card {
@@ -754,6 +758,12 @@ input[type="radio"], input[type="checkbox"] {
 /* Two-up field row (profile name/email, card front/back). */
 .field-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-4); }
 @media (min-width: 768px) { .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); } }
+
+/* Markdown preview on the card form: the toggle button and its hint on one
+   row, the panel (collapsed by default) below. */
+.preview-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.preview-panel { margin-top: var(--space-3); }
+.preview-panel .field-help { padding: var(--space-3) 0; }
 .member-since {
   margin-top: var(--space-4);
   font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--gray-500);
@@ -1157,8 +1167,9 @@ form[data-busy] .btn-busy { display: inline; }
   background: var(--gray-50); padding: var(--space-4);
 }
 .answer-panel h3 { font-size: var(--text-sm); line-height: var(--leading-sm); font-weight: 500; color: var(--gray-700); }
-.answer-panel p {
-  margin-top: var(--space-1); white-space: pre-wrap;
+/* As in the card detail view: the answer is a rendered .card-md block. */
+.answer-panel .card-md {
+  margin-top: var(--space-1);
   font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--gray-900);
 }
 .answer-sep { margin-top: var(--space-3); border-top: 1px solid var(--gray-200); padding-top: var(--space-3); }
@@ -1336,6 +1347,38 @@ form[data-busy] .btn-busy { display: inline; }
   border: 1px solid var(--gray-200); padding: var(--space-2); text-align: left;
 }
 .markdown-content th { background: var(--gray-50); font-weight: 500; }
+
+/* Elements the chat never produced but a card author can: goldmark emits all
+   of these and none were styled, so they fell through to the global reset. */
+.markdown-content h4, .markdown-content h5, .markdown-content h6 {
+  font-size: var(--text-sm); line-height: var(--leading-sm);
+  font-weight: 700; margin: 0.75rem 0 0.35rem;
+}
+.markdown-content h4:first-child,
+.markdown-content h5:first-child,
+.markdown-content h6:first-child { margin-top: 0; }
+.markdown-content hr {
+  border: 0; border-top: 1px solid var(--gray-200); margin: var(--space-3) 0;
+}
+.markdown-content del { color: var(--gray-500); }
+/* GFM task lists: drop the bullet the <ul> would otherwise keep. */
+.markdown-content ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: 0.4rem; }
+.markdown-content li > input[type="checkbox"] { margin-right: var(--space-2); }
+
+/* ---------- Card content markdown ----------
+   .markdown-content above is tuned for a chat bubble: it leans on
+   .chat-bubble for wrapping, and it sizes headings DOWN so a model's "# " does
+   not shout inside a bubble. Card content needs neither. .card-md is layered
+   on top wherever a card's front/back/note is rendered. */
+.card-md { overflow-wrap: anywhere; }
+/* Re-step the headings. A card sits under an h3 label already at --text-sm,
+   so a "# " inside it should read as emphasis, not as page chrome. */
+.card-md h1 { font-size: var(--text-lg);   line-height: var(--leading-lg); }
+.card-md h2 { font-size: var(--text-base); line-height: var(--leading-base); }
+.card-md h3 { font-size: var(--text-sm);   line-height: var(--leading-sm); }
+/* The first block sits flush against the label above it. */
+.card-md > :first-child { margin-top: 0; }
+.card-md > :last-child { margin-bottom: 0; }
 
 /* Typing dots */
 .typing-dots { display: inline-flex; gap: 0.2rem; margin-right: 0.3rem; }

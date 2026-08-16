@@ -754,3 +754,193 @@ func TestTopicFormDisclosureOpensWhenItHasContent(t *testing.T) {
 		t.Error("stored expertise not rendered into the edit form")
 	}
 }
+
+// ---------- Markdown card content ----------
+
+// seedMarkdownCard makes a card whose three fields all carry markdown, so the
+// display tests can assert on each independently.
+func (a *testApp) seedMarkdownCard() store.Card {
+	a.t.Helper()
+	ctx := context.Background()
+	u, _, err := a.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	topic, err := a.store.CreateTopic(ctx, u.ID, store.TopicParams{Name: "Markdown"})
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	deck, err := a.store.CreateDeck(ctx, u.ID, store.DeckParams{Name: "Syntax", TopicID: topic.ID})
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	note := "a *noted* thing"
+	card, err := a.store.CreateCard(ctx, u.ID, store.CardParams{
+		DeckID: deck.ID, Front: "**bold** front", Back: "- listed back",
+		Note: &note, Priority: sm2.PriorityB,
+	})
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return card
+}
+
+func TestCardShowRendersMarkdown(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seedMarkdownCard()
+
+	w := app.do("GET", "/cards/"+itoa(card.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("card show = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{"<strong>bold</strong>", "<li>listed back</li>", "<em>noted</em>"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("card detail missing %q", want)
+		}
+	}
+	if strings.Contains(body, "**bold**") {
+		t.Error("card detail still shows raw markdown source")
+	}
+}
+
+// The edit form must hand back the source, not the rendering — otherwise the
+// next save would persist HTML and destroy what the author wrote.
+func TestCardEditFormKeepsMarkdownSource(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seedMarkdownCard()
+
+	w := app.do("GET", "/cards/"+itoa(card.ID)+"?edit=1", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("card edit = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "**bold** front") {
+		t.Error("edit textarea lost the markdown source")
+	}
+	if strings.Contains(body, "<strong>bold</strong>") {
+		t.Error("edit form rendered the markdown instead of showing its source")
+	}
+}
+
+func TestCardTableStripsMarkdown(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seedMarkdownCard()
+
+	w := app.do("GET", "/cards/table", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("card table = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "bold front") {
+		t.Error("card table lost the front text")
+	}
+	if strings.Contains(body, "**bold**") || strings.Contains(body, "<strong>") {
+		t.Error("card table should show neither raw markdown nor rendered HTML")
+	}
+}
+
+func TestCardPreviewRendersAllThreeFields(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/preview", url.Values{
+		"front": {"**b**"}, "back": {"_i_"}, "note": {"`c`"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{"<strong>b</strong>", "<em>i</em>", "<code>c</code>", ">Front<", ">Back<", ">Note<"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("preview missing %q; body: %s", want, body)
+		}
+	}
+}
+
+func TestCardPreviewOmitsEmptyNote(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/preview", url.Values{"front": {"f"}, "back": {"b"}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview = %d", w.Code)
+	}
+	if strings.Contains(w.Body.String(), ">Note<") {
+		t.Error("preview rendered a Note section for a card with no note")
+	}
+}
+
+// Every branch must answer 200: base.html configures htmx to swap only 2xx,
+// 409 and 422, so any other status would silently leave a stale render.
+func TestCardPreviewEmptyFormRendersNotice(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/preview", url.Values{"front": {""}, "back": {" "}, "note": {""}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Nothing to preview yet") {
+		t.Errorf("empty preview did not render the notice; body: %s", w.Body.String())
+	}
+}
+
+// The endpoint echoes user input straight back as HTML, so it is the sharpest
+// place to pin the "raw HTML never survives" boundary.
+func TestCardPreviewNeverEmitsRawHTML(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/preview", url.Values{
+		"front": {"<script>alert(1)</script>"},
+		"back":  {"[x](javascript:alert(1))"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview = %d", w.Code)
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "<script>") {
+		t.Error("preview emitted a raw script tag")
+	}
+	if strings.Contains(strings.ToLower(body), "javascript:") {
+		t.Error("preview emitted a javascript: destination")
+	}
+}
+
+func TestCardPreviewRequiresAuth(t *testing.T) {
+	app := newTestApp(t, nil)
+
+	w := app.do("POST", "/cards/preview", url.Values{"front": {"**b**"}})
+	if w.Code == http.StatusOK {
+		t.Errorf("unauthenticated preview = %d, want a redirect", w.Code)
+	}
+	if strings.Contains(w.Body.String(), "<strong>") {
+		t.Error("unauthenticated preview rendered content")
+	}
+}
+
+// The study answer panel is the other place card content is read, and it goes
+// through StudyItem.Prompt/Answer rather than Front/Back.
+func TestStudyCardRendersMarkdown(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	app.seedMarkdownCard()
+
+	w := app.do("GET", "/study/1/next?deckIds=1&total=1&completed=0", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("next = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{"<strong>bold</strong>", "<li>listed back</li>", "<em>noted</em>"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("study card missing %q", want)
+		}
+	}
+	if strings.Contains(body, "**bold**") {
+		t.Error("study card still shows raw markdown source")
+	}
+}

@@ -169,8 +169,10 @@ type DashboardStats struct {
 
 // ActivityItem is one recent-review entry on the dashboard.
 type ActivityItem struct {
-	CardID    int64
-	Action    string
+	CardID int64
+	Action string
+	// ItemName is the card's front, in full and still as markdown. The
+	// template strips and truncates it.
 	ItemName  string
 	DeckName  string
 	Timestamp time.Time

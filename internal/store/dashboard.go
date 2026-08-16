@@ -101,12 +101,11 @@ func (s *Store) DashboardStats(ctx context.Context, userID int64, now time.Time)
 		if rev == 1 {
 			item.Action = "Reviewed card (reverse)"
 		}
-		// Truncate long fronts like the source (30 chars + ellipsis).
-		if len([]rune(front)) > 30 {
-			item.ItemName = string([]rune(front)[:30]) + "..."
-		} else {
-			item.ItemName = front
-		}
+		// The full front, markdown and all. The dashboard strips it to plain
+		// text before truncating (30 runes + ellipsis, like the source) —
+		// truncating here would spend the budget on markdown syntax and could
+		// cut a "**bold**" in half.
+		item.ItemName = front
 		if item.Timestamp, err = parseTime(seen); err != nil {
 			return DashboardStats{}, err
 		}

@@ -32,19 +32,21 @@
       <div class="field-grid">
         <div class="field">
           <label class="label" for="f-front">Front</label>
-          <textarea class="input" id="f-front" name="front" rows="4" required>{{$v.Front}}</textarea>
+          <textarea class="input" id="f-front" name="front" data-preview-source="#card-preview" rows="4" required>{{$v.Front}}</textarea>
         </div>
         <div class="field">
           <label class="label" for="f-back">Back</label>
-          <textarea class="input" id="f-back" name="back" rows="4" required>{{$v.Back}}</textarea>
+          <textarea class="input" id="f-back" name="back" data-preview-source="#card-preview" rows="4" required>{{$v.Back}}</textarea>
         </div>
       </div>
 
       <div class="field">
         <label class="label" for="f-note">Note</label>
-        <textarea class="input textarea-tall" id="f-note" name="note" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
+        <textarea class="input textarea-tall" id="f-note" name="note" data-preview-source="#card-preview" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
         <p class="field-help">Optional extra context shown when the answer is revealed.</p>
       </div>
+
+      {{template "card_preview_toggle"}}
 
       {{/* Bare radios in a real fieldset, as in the reference — accent-color
            gives them the indigo Tailwind's form styling provides there. */}}

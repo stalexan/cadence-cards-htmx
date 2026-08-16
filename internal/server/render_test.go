@@ -28,6 +28,7 @@ func TestPartialsExecuteAgainstZeroValues(t *testing.T) {
 		{"chat_composer", chatComposerData{}},
 		{"import_result", importResultData{}},
 		{"import_detect", importDetectData{}},
+		{"card_preview", cardPreviewData{}},
 		{"topic_form_fields", topicFieldsData{}},
 	}
 	for _, c := range cases {

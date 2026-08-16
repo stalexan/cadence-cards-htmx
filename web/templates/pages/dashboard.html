@@ -120,7 +120,9 @@
       <ul class="divide-list">
         {{range $d.RecentActivity}}
         <li>
-          <a class="activity-name" href="/cards/{{.CardID}}">{{.ItemName}}</a>
+          {{/* Strip the markdown before truncating, so the 30-rune budget is
+               spent on visible text rather than on syntax. */}}
+          <a class="activity-name" href="/cards/{{.CardID}}">{{truncate 30 (plaintext .ItemName)}}</a>
           <div class="activity-meta">{{.Action}} · {{.DeckName}} · {{formatDateTime .Timestamp}}</div>
         </li>
         {{end}}

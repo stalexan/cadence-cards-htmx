@@ -440,3 +440,43 @@ func TestAnonymousCreator(t *testing.T) {
 		t.Error("nil creator should fall back to Anonymous")
 	}
 }
+
+// Markdown card content is routinely multi-line, and the export format has to
+// carry it back unchanged. yaml.v3 emits a string containing a newline as a
+// literal block scalar, which preserves the breaks exactly; this pins that so
+// a future encoder change cannot quietly start folding card text.
+func TestRoundTripMultilineMarkdown(t *testing.T) {
+	note := "Mnemonic:\n\n1. first\n2. second"
+	front := "# Heading\n\n- bullet one\n- bullet two\n\n```go\nfmt.Println(\"hi\")\n```"
+	back := "A single line that is quite a lot longer than eighty characters, to be sure the encoder does not fold it."
+
+	out, err := Export([]ExportCard{{
+		Front: front, Back: back, Note: &note,
+		Priority: sm2.PriorityB, Tags: []string{"md"},
+		Forward: sm2.InitialState(),
+	}}, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Front: |-") {
+		t.Errorf("multi-line front was not written as a literal block:\n%s", out)
+	}
+
+	valid, invalid, err := Import(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invalid) != 0 || len(valid) != 1 {
+		t.Fatalf("re-import gave %d valid, %d invalid", len(valid), len(invalid))
+	}
+	got := valid[0]
+	if got.Front != front {
+		t.Errorf("front round-trip:\n got %q\nwant %q", got.Front, front)
+	}
+	if got.Back != back {
+		t.Errorf("back round-trip (folded?):\n got %q\nwant %q", got.Back, back)
+	}
+	if got.Note == nil || *got.Note != note {
+		t.Errorf("note round-trip: got %v, want %q", got.Note, note)
+	}
+}

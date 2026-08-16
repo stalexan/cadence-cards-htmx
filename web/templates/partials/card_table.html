@@ -87,8 +87,11 @@
         <tbody>
           {{range .Cards}}
           <tr>
-            <td><a class="table-link" href="/cards/{{.ID}}">{{.Front}}</a></td>
-            <td class="truncate">{{.Back}}</td>
+            {{/* Stripped to plain text, not rendered: a list or code block in
+                 the source would blow the row height out. plaintext also
+                 collapses newlines, which is what .truncate's nowrap needs. */}}
+            <td><a class="table-link" href="/cards/{{.ID}}">{{plaintext .Front}}</a></td>
+            <td class="truncate">{{plaintext .Back}}</td>
             {{if not $d.DeckID}}<td>{{.DeckName}}</td>{{end}}
             <td>{{template "priority_badge" .Priority}}</td>
             <td>{{with .ForwardSchedule}}{{formatDatePtr .LastSeen}}{{else}}—{{end}}</td>

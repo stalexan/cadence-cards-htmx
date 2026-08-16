@@ -42,6 +42,11 @@ browser console open:
 - an import that fails validation → the 422 result panel swaps in
 - a chat reply → the out-of-band swaps land in the transcript
 - study next → `HX-Push-Url` updates the address bar, and a refresh re-serves the same card
+- the card form's "Preview card" panel → renders on open, re-renders ~400ms after typing stops, and
+  issues **no** request while closed. It is the only place an `hx-trigger` fires on a custom event
+  that `app.js` dispatches (`toggle-shown`, `preview-input`), because htmx's own trigger filters
+  evaluate JS and the CSP forbids that; it also relies on htmx auto-including the enclosing form on
+  a non-GET, and on `hx-sync="this:replace"` for latest-wins ordering
 - any page → no CSP violations in the console (htmx runs with `allowEval:false`, and the strict CSP
   has no `unsafe-inline`/`unsafe-eval` to fall back on)
 

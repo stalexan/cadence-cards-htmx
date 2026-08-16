@@ -52,17 +52,19 @@
       <div class="field-grid">
         <div class="field">
           <label class="label" for="f-front">Front</label>
-          <textarea class="input" id="f-front" name="front" rows="4" required>{{$c.Front}}</textarea>
+          <textarea class="input" id="f-front" name="front" data-preview-source="#card-preview" rows="4" required>{{$c.Front}}</textarea>
         </div>
         <div class="field">
           <label class="label" for="f-back">Back</label>
-          <textarea class="input" id="f-back" name="back" rows="4" required>{{$c.Back}}</textarea>
+          <textarea class="input" id="f-back" name="back" data-preview-source="#card-preview" rows="4" required>{{$c.Back}}</textarea>
         </div>
       </div>
       <div class="field">
         <label class="label" for="f-note">Note</label>
-        <textarea class="input textarea-tall" id="f-note" name="note" rows="2" data-autoresize>{{deref $c.Note}}</textarea>
+        <textarea class="input textarea-tall" id="f-note" name="note" data-preview-source="#card-preview" rows="2" data-autoresize>{{deref $c.Note}}</textarea>
       </div>
+
+      {{template "card_preview_toggle"}}
       <fieldset class="field">
         <legend class="label">Priority</legend>
         <div class="radio-row">
@@ -112,18 +114,23 @@
       </div>
     </dl>
 
+    {{/* Card content is markdown. .markdown-content carries the shared prose
+         rules; .card-md adapts them from the chat bubble they were written for
+         to a full-width card. */}}
     <div class="content-card">
       <h3>Front</h3>
-      <p>{{$c.Front}}</p>
+      <div class="markdown-content card-md">{{markdown $c.Front}}</div>
     </div>
     <div class="content-card">
       <h3>Back</h3>
-      <p>{{$c.Back}}</p>
+      <div class="markdown-content card-md">{{markdown $c.Back}}</div>
     </div>
+    {{/* deref: Note is a *string, and funcMap arguments are not auto-
+         indirected the way a bare {{.}} would be. */}}
     {{with $c.Note}}
     <div class="note-card">
       <h3>Note</h3>
-      <p>{{.}}</p>
+      <div class="markdown-content card-md">{{markdown (deref .)}}</div>
     </div>
     {{end}}
 

@@ -109,6 +109,7 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("GET /cards", auth(s.handleCardsList))
 	mux.HandleFunc("GET /cards/table", auth(s.handleCardsTableFragment))
 	mux.HandleFunc("GET /cards/deck-options", auth(s.handleCardDeckOptions))
+	mux.HandleFunc("POST /cards/preview", auth(s.handleCardPreview))
 	mux.HandleFunc("GET /cards/new", auth(s.handleCardNewPage))
 	mux.HandleFunc("POST /cards", auth(s.handleCardCreate))
 	mux.HandleFunc("GET /cards/{id}", auth(s.handleCardShow))

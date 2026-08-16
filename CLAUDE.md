@@ -120,8 +120,17 @@ and HTMX swapping fragments.
   Deliberately **not** on the `server.AI` interface — handlers never batch, so handler tests stay
   offline; the runner is wired only in `cmd/cadence` with the concrete `*claude.Client`.
   Config: `DISABLE_QUESTION_PREGEN`, `QUESTION_PREGEN_HOUR` (local time).
-- `internal/markdown/` — goldmark wrapper for Claude replies. Raw HTML is escaped (no
-  `html.WithUnsafe`); this is the XSS boundary — do not change it.
+- `internal/markdown/` — goldmark wrapper (GFM) for Claude's replies **and** for card
+  `Front`/`Back`/`Note`, which are authored as markdown and rendered wherever a card is read.
+  Raw HTML is dropped, not escaped-and-shown (no `html.WithUnsafe`), and the same setting keeps
+  goldmark's `IsDangerousURL` filtering `javascript:`/`vbscript:`/`file:`/non-image `data:`
+  destinations; this is the XSS boundary — do not change it. `PlainText` is the second entry
+  point: it walks the parsed AST (never a regex, so a literal `*` in prose is never mistaken for
+  emphasis) to reduce markdown to one line of visible text, for the card table cells and the
+  dashboard's activity list where rendered HTML would break the layout. Two consequences worth
+  knowing: card **search** (`store.ListCards`) still does `LIKE` against the raw source, so a
+  phrase straddling markup won't match; and `img-src 'self' data:` means a remote image in a card
+  never loads, leaving its alt text.
 - `internal/server/` — handlers stay thin: parse form → store/AI call → render page or fragment.
   `render.go` parses one independent template set per page (layout + all partials + page) and
   a partials-only set for fragments.  `server.go` registers every route (Go 1.22+ method patterns on

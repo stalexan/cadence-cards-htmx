@@ -305,6 +305,58 @@ type deckOptionsData struct {
 	Selected string
 }
 
+// maxPreviewField bounds one field of a preview request. Generous next to any
+// real card, but it keeps a paste-bomb from turning into a large render.
+const maxPreviewField = 64 << 10
+
+// cardPreviewData feeds the card_preview partial: the three markdown fields as
+// the author currently has them typed. The labels are static rather than the
+// deck's Field1Label/Field2Label — the preview exists to check formatting, and
+// resolving a deck would put a DB round-trip on a debounced keystroke path.
+type cardPreviewData struct {
+	Front string
+	Back  string
+	Note  string
+	// Empty is true when all three fields are blank, so the panel can say so
+	// instead of rendering three empty boxes.
+	Empty bool
+}
+
+// handleCardPreview renders the card form's current front/back/note as
+// markdown. It runs the same markdown.Render the card and study pages use, so
+// the preview cannot drift from what saving actually produces — the same
+// reason POST /import/detect runs the real parsers rather than sniffing the
+// text in JavaScript. A pure render: no store access, and like the other live
+// hint endpoints it answers 200 in every branch so htmx always swaps.
+func (s *Server) handleCardPreview(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4*maxPreviewField)
+	if err := r.ParseForm(); err != nil {
+		s.fragment(w, http.StatusOK, "card_preview", cardPreviewData{Empty: true})
+		return
+	}
+	data := cardPreviewData{
+		Front: clampField(r.FormValue("front")),
+		Back:  clampField(r.FormValue("back")),
+		Note:  clampField(r.FormValue("note")),
+	}
+	data.Empty = strings.TrimSpace(data.Front) == "" &&
+		strings.TrimSpace(data.Back) == "" &&
+		strings.TrimSpace(data.Note) == ""
+	s.fragment(w, http.StatusOK, "card_preview", data)
+}
+
+// clampField cuts an over-long preview field at a rune boundary.
+func clampField(s string) string {
+	if len(s) <= maxPreviewField {
+		return s
+	}
+	r := []rune(s)
+	if len(r) > maxPreviewField {
+		r = r[:maxPreviewField]
+	}
+	return string(r)
+}
+
 func (s *Server) cardFormData(r *http.Request, card *store.Card, params store.CardParams, errMsg string) (cardFormData, error) {
 	userID := userFrom(r).ID
 	topics, err := s.store.ListTopics(r.Context(), userID)

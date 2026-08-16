@@ -53,17 +53,21 @@
         <button type="button" class="btn btn-secondary btn-block" data-toggle="#answer-panel"
                 data-label-show="Show Answer" data-label-hide="Hide Answer">{{template "icon-eye"}} <span data-toggle-label>Show Answer</span></button>
         <div id="answer-panel" hidden>
+          {{/* Card content is markdown. Prompt/Answer are already direction-
+               resolved by the store, so a reversed card renders both sides. */}}
           <div class="answer-panel">
             <h3>{{$item.PromptLabel}}</h3>
-            <p>{{$item.Prompt}}</p>
+            <div class="markdown-content card-md">{{markdown $item.Prompt}}</div>
             <div class="answer-sep">
               <h3>{{$item.AnswerLabel}}</h3>
-              <p>{{$item.Answer}}</p>
+              <div class="markdown-content card-md">{{markdown $item.Answer}}</div>
             </div>
+            {{/* deref: Note is a *string, and funcMap arguments are not auto-
+                 indirected the way a bare {{.}} would be. */}}
             {{with $item.Note}}
             <div class="answer-sep">
               <h3>Note</h3>
-              <p>{{.}}</p>
+              <div class="markdown-content card-md">{{markdown (deref .)}}</div>
             </div>
             {{end}}
             {{/* Inside the panel so it only appears with the answer. A normal

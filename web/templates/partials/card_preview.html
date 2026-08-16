@@ -1,0 +1,71 @@
+{{/* Live markdown preview of the card form, swapped into #card-preview-body by
+     POST /cards/preview. Context: cardPreviewData.
+
+     The layout mirrors the study screen's answer panel (study_card.html) on
+     purpose: that is where this content lands, so the preview should look like
+     it. Rendering goes through the same {{markdown}} helper the card and study
+     pages use, so what is shown here is exactly what will be saved and read. */}}
+{{/* The toggle + empty panel, shared verbatim by the create form
+     (pages/cards_form.html) and the edit form (pages/cards_show.html) so the
+     two cannot drift. Takes no context.
+
+     The button only opens and closes: data-toggle is the delegated handler in
+     app.js that already backs the study screen's "Show Answer" button, and it
+     flips [hidden] and rewrites the [data-toggle-label] span (never the
+     button's textContent, which would destroy the eye SVG). type=button
+     matters — the default inside a form is submit.
+
+     The panel owns the fetching. It renders on toggle-shown, which app.js
+     dispatches when the panel opens, so nothing is ever requested for a
+     preview nobody asked for; then on preview-input, which app.js dispatches
+     while the panel is open and a [data-preview-source] textarea is typed in.
+     That gate lives in JS because htmx spells it as an hx-trigger filter,
+     and filters evaluate JS, which the CSP forbids. delay: keeps the debounce
+     declarative, as on the import textarea.
+
+     No hx-include: htmx includes the enclosing form's values on every non-GET
+     (htmx.js:3623), and this panel is inside the form. hx-sync replaces an
+     in-flight render so a slow response can never land on top of a newer one.
+
+     The textareas are required, but that does not block the preview: htmx
+     validates only when the triggering element is itself a <form> or carries
+     hx-validate="true" (htmx.js:3616). Do not add hx-validate — a half-written
+     card must still preview. */}}
+{{define "card_preview_toggle"}}
+<div class="field">
+  <div class="preview-row">
+    <button type="button" class="btn btn-secondary btn-sm"
+            data-toggle="#card-preview"
+            data-label-show="Preview card" data-label-hide="Hide preview">{{template "icon-eye"}} <span data-toggle-label>Preview card</span></button>
+    <span class="field-help">Front, back, and note are Markdown.</span>
+  </div>
+  <div id="card-preview" hidden
+       hx-post="/cards/preview"
+       hx-trigger="toggle-shown, preview-input delay:400ms"
+       hx-target="#card-preview-body" hx-swap="innerHTML"
+       hx-sync="this:replace">
+    <div id="card-preview-body" class="preview-panel"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "card_preview"}}
+{{if .Empty}}
+<p class="field-help">Nothing to preview yet — type in the fields above.</p>
+{{else}}
+<div class="answer-panel">
+  <h3>Front</h3>
+  <div class="markdown-content card-md">{{markdown .Front}}</div>
+  <div class="answer-sep">
+    <h3>Back</h3>
+    <div class="markdown-content card-md">{{markdown .Back}}</div>
+  </div>
+  {{with .Note}}
+  <div class="answer-sep">
+    <h3>Note</h3>
+    <div class="markdown-content card-md">{{markdown .}}</div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+{{end}}

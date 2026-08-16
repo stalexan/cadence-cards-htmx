@@ -46,8 +46,21 @@ var funcMap = template.FuncMap{
 		return t.In(time.Local).Format("Jan 2, 2006")
 	},
 	"markdown": markdown.Render,
-	"add":      func(a, b int) int { return a + b },
-	"sub":      func(a, b int) int { return a - b },
+	// plaintext strips markdown to its visible text, for the one-line
+	// contexts (table cells, dashboard activity) where the rendered HTML
+	// would break the layout but the raw source is noise.
+	"plaintext": markdown.PlainText,
+	// truncate cuts to n runes and appends an ellipsis. Rune-safe so it
+	// cannot split a multi-byte character.
+	"truncate": func(n int, s string) string {
+		r := []rune(s)
+		if len(r) <= n {
+			return s
+		}
+		return string(r[:n]) + "..."
+	},
+	"add": func(a, b int) int { return a + b },
+	"sub": func(a, b int) int { return a - b },
 	"deref": func(p *string) string {
 		if p == nil {
 			return ""

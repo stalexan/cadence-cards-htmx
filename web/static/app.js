@@ -18,6 +18,26 @@
     // would destroy sibling children like the eye icon SVG.
     var label = btn.querySelector("[data-toggle-label]") || btn;
     label.textContent = hidden ? show : hide;
+    // Same trick as data-open-dialog below: a custom event lets a panel fetch
+    // its contents on open via hx-trigger="toggle-shown" (the card form's
+    // markdown preview). toggleAttribute returns true when the attribute is
+    // now present, so !hidden means "just opened". Not fired on close —
+    // there is nothing to fetch for a panel going away.
+    if (!hidden) panel.dispatchEvent(new Event("toggle-shown"));
+  });
+
+  // ----- Live preview while an open panel is being typed into -----
+  // The panel owns the request (hx-post on #card-preview); this only decides
+  // whether to ask for one. htmx would express "only while open" as an
+  // hx-trigger filter, but filters eval JS and the CSP has no 'unsafe-eval' —
+  // so the gate lives here, and a closed panel costs nothing at all. The
+  // debounce stays declarative, in the panel's delay: modifier.
+  document.addEventListener("input", function (e) {
+    if (!e.target.matches || !e.target.matches("[data-preview-source]")) return;
+    var panel = document.querySelector(e.target.getAttribute("data-preview-source"));
+    if (panel && !panel.hasAttribute("hidden")) {
+      panel.dispatchEvent(new Event("preview-input"));
+    }
   });
 
   // ----- Copy to clipboard with a 2s checkmark -----
