@@ -22,7 +22,11 @@ type stubAI struct {
 	question   string
 	reply      string
 	suggestion claude.TopicSuggestion
-	err        error
+	revision   claude.CardRevision
+	// assistCtx, when set, captures the context the handler resolved — the
+	// ownership test needs to see it, and value receivers cannot store it.
+	assistCtx *claude.CardAssistContext
+	err       error
 }
 
 func (s stubAI) GenerateQuestion(context.Context, claude.TopicConfig, claude.CardContent) (string, error) {
@@ -36,6 +40,12 @@ func (s stubAI) ChatAboutTopic(context.Context, claude.TopicConfig, string, []cl
 }
 func (s stubAI) SuggestTopicConfig(context.Context, string) (claude.TopicSuggestion, error) {
 	return s.suggestion, s.err
+}
+func (s stubAI) AssistCard(_ context.Context, actx claude.CardAssistContext, _ claude.CardDraft, _ string) (claude.CardRevision, error) {
+	if s.assistCtx != nil {
+		*s.assistCtx = actx
+	}
+	return s.revision, s.err
 }
 
 type testApp struct {
@@ -718,6 +728,250 @@ func TestTopicSuggestRendersAIFailureAsBubble(t *testing.T) {
 		if !strings.Contains(body, `name="name"`) {
 			t.Errorf("%v: form fields not re-rendered after the failure", c.err)
 		}
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
+// revisionFixture rewrites all three content fields, so a test can assert on
+// any of them.
+var revisionFixture = claude.CardRevision{
+	Front: strPtr("to run"),
+	Back:  strPtr("correr"),
+	Note:  strPtr("Corro todas las mañanas."),
+}
+
+// With every field empty, an assist is a from-scratch draft: all three fields
+// come back filled and the instruction box comes back empty, ready for the
+// next refinement.
+func TestCardAssistDraftsEmptyCard(t *testing.T) {
+	app := newTestApp(t, stubAI{revision: revisionFixture})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"a card for the Spanish verb correr"},
+		"front":       {""}, "back": {""}, "note": {""},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("assist = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	// Textarea content renders between the tags, not as a value attribute.
+	for _, filled := range []string{">to run</textarea>", ">correr</textarea>", ">Corro todas las mañanas.</textarea>"} {
+		if !strings.Contains(body, filled) {
+			t.Errorf("drafted field not rendered: %q missing", filled)
+		}
+	}
+	if !strings.Contains(body, "3 fields updated") {
+		t.Errorf("notice missing or miscounted; body: %.400s", body)
+	}
+	if !strings.Contains(body, `name="instruction" value=""`) {
+		t.Error("instruction box not cleared after a successful assist")
+	}
+}
+
+// The deliberate divergence from topic suggest: a field the revision carries
+// is overwritten even when the user has typed in it, and a field it omits is
+// left exactly as typed.
+func TestCardAssistRevisesFilledFields(t *testing.T) {
+	app := newTestApp(t, stubAI{revision: claude.CardRevision{Back: strPtr("| es | en |")}})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"format the back as a table"},
+		"front":       {"to run"}, "back": {"correr"}, "note": {"my note"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("assist = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, ">| es | en |</textarea>") {
+		t.Error("revised back not rendered")
+	}
+	if strings.Contains(body, ">correr</textarea>") {
+		t.Error("old back survived a revision that replaced it")
+	}
+	for _, kept := range []string{">to run</textarea>", ">my note</textarea>"} {
+		if !strings.Contains(body, kept) {
+			t.Errorf("untouched field lost: %q missing", kept)
+		}
+	}
+	if !strings.Contains(body, "1 field updated") {
+		t.Errorf("notice missing or miscounted; body: %.400s", body)
+	}
+}
+
+// A revision carrying an empty note is a clear, not a no-op.
+func TestCardAssistClearsNote(t *testing.T) {
+	app := newTestApp(t, stubAI{revision: claude.CardRevision{Note: strPtr("")}})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"drop the note"},
+		"front":       {"to run"}, "back": {"correr"}, "note": {"stale note"},
+	})
+	body := w.Body.String()
+	if !strings.Contains(body, `name="note" data-preview-source="#card-preview" rows="2" data-autoresize></textarea>`) {
+		t.Error("note textarea not emptied")
+	}
+	if strings.Contains(body, "stale note") {
+		t.Error("cleared note still rendered")
+	}
+}
+
+func TestCardAssistRequiresInstruction(t *testing.T) {
+	app := newTestApp(t, stubAI{revision: revisionFixture})
+	app.login("t@example.com")
+
+	w := app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"   "},
+		"front":       {"typed front"}, "back": {""}, "note": {""},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("empty instruction = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Tell Claude what you want first") {
+		t.Errorf("no prompt for an instruction; body: %.300s", body)
+	}
+	if strings.Contains(body, "updated") {
+		t.Error("AI was called despite an empty instruction")
+	}
+	if !strings.Contains(body, ">typed front</textarea>") {
+		t.Error("typed values lost on the empty-instruction re-render")
+	}
+}
+
+// Assistance is optional sugar: when Claude is unreachable the fields must
+// come back intact with the failure as a bubble at 200, and the instruction
+// echoed so a retry costs nothing.
+func TestCardAssistRendersAIFailureAsBubble(t *testing.T) {
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{claude.ErrBadAuth, "API key was rejected"},
+		{claude.ErrNotConfigured, "no Claude API key"},
+		{claude.ErrRateLimited, "rate-limited"},
+	}
+	for _, c := range cases {
+		app := newTestApp(t, stubAI{err: c.err})
+		app.login("t@example.com")
+
+		w := app.do("POST", "/cards/assist", url.Values{
+			"instruction": {"a card about correr"},
+			"front":       {"typed front"}, "back": {""}, "note": {""},
+		})
+		if w.Code != http.StatusOK {
+			t.Fatalf("%v = %d, want 200", c.err, w.Code)
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, c.want) {
+			t.Errorf("%v: missing copy %q; body: %.300s", c.err, c.want, body)
+		}
+		if !strings.Contains(body, ">typed front</textarea>") {
+			t.Errorf("%v: typed values lost after the failure", c.err)
+		}
+		if !strings.Contains(body, `name="instruction" value="a card about correr"`) {
+			t.Errorf("%v: instruction not echoed back for a retry", c.err)
+		}
+	}
+}
+
+// A selected deck supplies the prompt context: topic name and field labels,
+// resolved server-side — the browser only ever sends the deck's ID.
+func TestCardAssistLoadsDeckContext(t *testing.T) {
+	var got claude.CardAssistContext
+	app := newTestApp(t, stubAI{revision: revisionFixture, assistCtx: &got})
+	app.login("t@example.com")
+	card := app.seed(false)
+
+	w := app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"a greeting card"},
+		"deckId":      {fmt.Sprint(card.DeckID)},
+		"front":       {""}, "back": {""}, "note": {""},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("assist = %d, want 200", w.Code)
+	}
+	if got.TopicName != "Spanish" {
+		t.Errorf("TopicName = %q, want %q", got.TopicName, "Spanish")
+	}
+	if got.FrontLabel != "Front" || got.BackLabel != "Back" {
+		t.Errorf("labels = %q/%q, want the Front/Back fallbacks", got.FrontLabel, got.BackLabel)
+	}
+}
+
+// Another user's deck ID must not leak their topic into the prompt: the
+// lookup is ownership-scoped, so a foreign ID degrades to generic context
+// while the assist itself still succeeds.
+func TestCardAssistIgnoresForeignDeck(t *testing.T) {
+	var got claude.CardAssistContext
+	app := newTestApp(t, stubAI{revision: revisionFixture, assistCtx: &got})
+	app.login("t@example.com")
+
+	// A second user with a deck of their own, created directly in the store.
+	w := app.do("POST", "/register", url.Values{
+		"name": {"Other"}, "email": {"other@example.com"},
+		"password": {"password123"}, "confirmPassword": {"password123"},
+	})
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("second register = %d", w.Code)
+	}
+	ctx := context.Background()
+	other, _, err := app.store.GetUserByEmail(ctx, "other@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	topic, err := app.store.CreateTopic(ctx, other.ID, store.TopicParams{Name: "Secrets"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deck, err := app.store.CreateDeck(ctx, other.ID, store.DeckParams{Name: "Hidden", TopicID: topic.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got = claude.CardAssistContext{TopicName: "sentinel"}
+	w = app.do("POST", "/cards/assist", url.Values{
+		"instruction": {"a card"},
+		"deckId":      {fmt.Sprint(deck.ID)},
+		"front":       {""}, "back": {""}, "note": {""},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("assist = %d, want 200", w.Code)
+	}
+	if got != (claude.CardAssistContext{}) {
+		t.Errorf("foreign deck leaked context: %+v", got)
+	}
+	if !strings.Contains(w.Body.String(), "3 fields updated") {
+		t.Error("assist should still succeed with generic context")
+	}
+}
+
+// Both card forms carry the assist box, and putting it there must not swallow
+// the edit form's optimistic-locking token.
+func TestCardFormsIncludeAssistBox(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+
+	for _, path := range []string{"/cards/new", fmt.Sprintf("/cards/%d?edit=1", card.ID)} {
+		w := app.do("GET", path, nil)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s = %d", path, w.Code)
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, `id="card-content-fields"`) {
+			t.Errorf("%s: assist swap target missing", path)
+		}
+		if !strings.Contains(body, `name="instruction"`) {
+			t.Errorf("%s: assist instruction box missing", path)
+		}
+	}
+	w := app.do("GET", fmt.Sprintf("/cards/%d?edit=1", card.ID), nil)
+	if !strings.Contains(w.Body.String(), `name="version"`) {
+		t.Error("edit form lost its version input")
 	}
 }
 

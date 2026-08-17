@@ -30,6 +30,7 @@ func TestPartialsExecuteAgainstZeroValues(t *testing.T) {
 		{"import_detect", importDetectData{}},
 		{"card_preview", cardPreviewData{}},
 		{"topic_form_fields", topicFieldsData{}},
+		{"card_content_fields", cardContentData{}},
 	}
 	for _, c := range cases {
 		if err := partials.ExecuteTemplate(io.Discard, c.name, c.data); err != nil {

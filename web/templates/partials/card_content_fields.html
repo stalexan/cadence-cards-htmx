@@ -1,0 +1,57 @@
+{{/* The card's three markdown fields plus the assist box. Context:
+     cardContentData.
+
+     Rendered three ways from one definition: by cards_form.html (create), by
+     the edit branch of cards_show.html, and by POST /cards/assist, which
+     returns this whole block with Claude's draft already in the textareas.
+     Unlike topic suggest, assist may rewrite filled fields — that is what
+     makes it iterative — so nothing outside this block (deck select, version
+     input, priority, tags) may live inside the swap.
+
+     The assist box sits inside the swapped region, so the handler echoes the
+     instruction back on failure; on success it clears it, ready for the next
+     refinement. */}}
+{{define "card_content_fields"}}
+<div class="suggest-box">
+  <label class="label" for="f-assist">Draft with Claude</label>
+  <div class="suggest-row">
+    <input class="input" id="f-assist" type="text" name="instruction" value="{{.Instruction}}"
+           placeholder="Describe a new card, or tell Claude what to change…">
+    <button type="button" class="btn btn-secondary"
+            hx-post="/cards/assist" hx-include="closest form"
+            hx-target="#card-content-fields" hx-swap="innerHTML"
+            hx-disabled-elt="this" hx-indicator="#assist-spinner">
+      {{template "icon-sparkles"}}<span>Draft card</span>
+    </button>
+    <span id="assist-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </div>
+  <p class="field-help">Optional. Claude writes or revises the front, back, and
+    note from your instruction — press it again with a new instruction to
+    refine. Nothing is saved until you submit.</p>
+</div>
+
+{{if .Error}}{{template "alert" (dict "Kind" "error" "Body" .Error)}}{{end}}
+{{if .Notice}}
+<div class="alert alert-compact alert-success">
+  {{template "icon-check-circle"}}
+  <div class="alert-body"><span class="alert-title">{{.Notice}}</span></div>
+</div>
+{{end}}
+
+<div class="field-grid">
+  <div class="field">
+    <label class="label" for="f-front">Front</label>
+    <textarea class="input" id="f-front" name="front" data-preview-source="#card-preview" rows="4" required>{{.Front}}</textarea>
+  </div>
+  <div class="field">
+    <label class="label" for="f-back">Back</label>
+    <textarea class="input" id="f-back" name="back" data-preview-source="#card-preview" rows="4" required>{{.Back}}</textarea>
+  </div>
+</div>
+
+<div class="field">
+  <label class="label" for="f-note">Note</label>
+  <textarea class="input textarea-tall" id="f-note" name="note" data-preview-source="#card-preview" rows="2" data-autoresize>{{.Note}}</textarea>
+  <p class="field-help">Optional extra context shown when the answer is revealed.</p>
+</div>
+{{end}}

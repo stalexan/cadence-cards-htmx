@@ -29,21 +29,12 @@
         </select>
       </div>
 
-      <div class="field-grid">
-        <div class="field">
-          <label class="label" for="f-front">Front</label>
-          <textarea class="input" id="f-front" name="front" data-preview-source="#card-preview" rows="4" required>{{$v.Front}}</textarea>
-        </div>
-        <div class="field">
-          <label class="label" for="f-back">Back</label>
-          <textarea class="input" id="f-back" name="back" data-preview-source="#card-preview" rows="4" required>{{$v.Back}}</textarea>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="label" for="f-note">Note</label>
-        <textarea class="input textarea-tall" id="f-note" name="note" data-preview-source="#card-preview" rows="2" data-autoresize>{{deref $v.Note}}</textarea>
-        <p class="field-help">Optional extra context shown when the answer is revealed.</p>
+      {{/* The wrapper is the assist swap target; it is outside the partial so
+           hx-swap="innerHTML" can replace the partial's output without
+           destroying the target, and it repeats class="stack" because it
+           collapses what were direct children of form.stack into one. */}}
+      <div id="card-content-fields" class="stack">
+        {{template "card_content_fields" $d.ContentFields}}
       </div>
 
       {{template "card_preview_toggle"}}

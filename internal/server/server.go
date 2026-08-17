@@ -20,6 +20,7 @@ type AI interface {
 	ChatAboutQuestion(ctx context.Context, cfg claude.TopicConfig, card claude.CardContent, userAnswer string, previous []claude.Message) (string, error)
 	ChatAboutTopic(ctx context.Context, cfg claude.TopicConfig, message string, previous []claude.Message, isFirst bool) (string, error)
 	SuggestTopicConfig(ctx context.Context, description string) (claude.TopicSuggestion, error)
+	AssistCard(ctx context.Context, actx claude.CardAssistContext, draft claude.CardDraft, instruction string) (claude.CardRevision, error)
 }
 
 // Server holds the application's HTTP surface.
@@ -110,6 +111,7 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("GET /cards/table", auth(s.handleCardsTableFragment))
 	mux.HandleFunc("GET /cards/deck-options", auth(s.handleCardDeckOptions))
 	mux.HandleFunc("POST /cards/preview", auth(s.handleCardPreview))
+	mux.HandleFunc("POST /cards/assist", auth(s.handleCardAssist))
 	mux.HandleFunc("GET /cards/new", auth(s.handleCardNewPage))
 	mux.HandleFunc("POST /cards", auth(s.handleCardCreate))
 	mux.HandleFunc("GET /cards/{id}", auth(s.handleCardShow))

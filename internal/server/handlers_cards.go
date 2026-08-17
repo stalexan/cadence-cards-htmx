@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"cadence-cards/internal/claude"
 	"cadence-cards/internal/sm2"
 	"cadence-cards/internal/store"
 )
@@ -283,6 +284,37 @@ func (d cardFormData) DecksForSelectedTopic() []store.Deck {
 	return out
 }
 
+// cardContentData feeds the card_content_fields partial: the assist box plus
+// the front/back/note inputs, the region POST /cards/assist re-renders.
+type cardContentData struct {
+	Front string
+	Back  string
+	Note  string
+	// Instruction is echoed back on failure so a retry costs nothing, and
+	// cleared on success: the next press of an iterative feature carries a new
+	// instruction, and echoing the old one risks re-applying it.
+	Instruction string
+	Notice      string
+	Error       string
+}
+
+// ContentFields adapts the form's two data sources to the shared partial: the
+// edit page renders from the card, the create page from the typed params.
+func (d cardFormData) ContentFields() cardContentData {
+	if d.Editing && d.Card != nil {
+		c := cardContentData{Front: d.Card.Front, Back: d.Card.Back}
+		if d.Card.Note != nil {
+			c.Note = *d.Card.Note
+		}
+		return c
+	}
+	c := cardContentData{Front: d.Params.Front, Back: d.Params.Back}
+	if d.Params.Note != nil {
+		c.Note = *d.Params.Note
+	}
+	return c
+}
+
 // handleCardDeckOptions re-renders just the deck <select> options when the
 // topic select changes. The reference filters this list client-side; doing it
 // server-side keeps the page free of custom JS under the strict CSP.
@@ -355,6 +387,89 @@ func clampField(s string) string {
 		r = r[:maxPreviewField]
 	}
 	return string(r)
+}
+
+// handleCardAssist drafts or revises the card's front/back/note from a
+// one-line instruction. Unlike topic suggest it may overwrite filled fields —
+// that is the point: the user iterates by sending new instructions against
+// the current draft. Like the other in-form AI endpoints it answers 200 in
+// every branch (htmx only swaps 2xx/409/422) and renders failures as bubbles.
+func (s *Server) handleCardAssist(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4*maxPreviewField)
+	d := cardContentData{
+		Front:       r.FormValue("front"),
+		Back:        r.FormValue("back"),
+		Note:        r.FormValue("note"),
+		Instruction: formStr(r, "instruction"),
+	}
+	if d.Instruction == "" {
+		d.Error = "Tell Claude what you want first — a few words is enough."
+		s.fragment(w, http.StatusOK, "card_content_fields", d)
+		return
+	}
+
+	rev, err := s.ai.AssistCard(r.Context(), s.cardAssistContext(r),
+		claude.CardDraft{Front: d.Front, Back: d.Back, Note: d.Note}, d.Instruction)
+	if err != nil {
+		d.Error = aiErrorMessage(err)
+		s.fragment(w, http.StatusOK, "card_content_fields", d)
+		return
+	}
+
+	changed := applyRevision(&d, rev)
+	d.Notice = plural(changed, "field", "fields") + " updated. Review below, then save."
+	d.Instruction = ""
+	s.fragment(w, http.StatusOK, "card_content_fields", d)
+}
+
+// applyRevision overwrites the fields the revision carries and counts them.
+// Front and back only ever change to non-empty values (the parser already
+// guarantees this; the check here is belt and braces), while a non-nil empty
+// note is a deliberate clear.
+func applyRevision(d *cardContentData, rev claude.CardRevision) int {
+	changed := 0
+	if rev.Front != nil && *rev.Front != "" {
+		d.Front = *rev.Front
+		changed++
+	}
+	if rev.Back != nil && *rev.Back != "" {
+		d.Back = *rev.Back
+		changed++
+	}
+	if rev.Note != nil {
+		d.Note = *rev.Note
+		changed++
+	}
+	return changed
+}
+
+// cardAssistContext resolves prompt context from the form's deck (preferred)
+// or topic selection. Everything is fetched server-side by ID with the
+// requester's userID — the browser never supplies topic or deck text — so a
+// foreign ID is just ErrNotFound and, like every other failure here, degrades
+// to the zero value: assistance without context beats no assistance.
+func (s *Server) cardAssistContext(r *http.Request) claude.CardAssistContext {
+	userID := userFrom(r).ID
+	if deckID, _ := strconv.ParseInt(formStr(r, "deckId"), 10, 64); deckID > 0 {
+		if deck, err := s.store.GetDeck(r.Context(), userID, deckID); err == nil {
+			front, back := deck.FieldLabels()
+			actx := claude.CardAssistContext{TopicName: deck.TopicName, FrontLabel: front, BackLabel: back}
+			if topic, err := s.store.GetTopic(r.Context(), userID, deck.TopicID); err == nil && topic.TopicDescription != nil {
+				actx.TopicDesc = *topic.TopicDescription
+			}
+			return actx
+		}
+	}
+	if topicID, _ := strconv.ParseInt(formStr(r, "topicId"), 10, 64); topicID > 0 {
+		if topic, err := s.store.GetTopic(r.Context(), userID, topicID); err == nil {
+			actx := claude.CardAssistContext{TopicName: topic.Name}
+			if topic.TopicDescription != nil {
+				actx.TopicDesc = *topic.TopicDescription
+			}
+			return actx
+		}
+	}
+	return claude.CardAssistContext{}
 }
 
 func (s *Server) cardFormData(r *http.Request, card *store.Card, params store.CardParams, errMsg string) (cardFormData, error) {

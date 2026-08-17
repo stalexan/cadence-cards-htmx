@@ -371,7 +371,21 @@
     initAutoresize(e.target);
     initTagInputs(e.target);
     if (e.target && e.target.id === "chat-messages") scrollChatToNewest();
+    refreshPreview(e.target);
   });
+  // When a swap replaces preview-source fields (the card assist rewriting the
+  // textareas), an open preview panel is showing the old draft: the input
+  // listener above only fires for typing. Ask the panel to re-fetch, same
+  // open-panel gate as typing.
+  function refreshPreview(root) {
+    if (!root || !root.querySelector) return;
+    var source = root.querySelector("[data-preview-source]");
+    if (!source) return;
+    var panel = document.querySelector(source.getAttribute("data-preview-source"));
+    if (panel && !panel.hasAttribute("hidden")) {
+      panel.dispatchEvent(new Event("preview-input"));
+    }
+  }
   // OOB swaps (question fragment, history updates, grade-conflict bubble).
   document.addEventListener("htmx:oobAfterSwap", function (e) {
     if (e.target && e.target.id === "chat-messages") scrollChatToNewest();

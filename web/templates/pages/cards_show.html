@@ -49,19 +49,11 @@
           {{end}}
         </select>
       </div>
-      <div class="field-grid">
-        <div class="field">
-          <label class="label" for="f-front">Front</label>
-          <textarea class="input" id="f-front" name="front" data-preview-source="#card-preview" rows="4" required>{{$c.Front}}</textarea>
-        </div>
-        <div class="field">
-          <label class="label" for="f-back">Back</label>
-          <textarea class="input" id="f-back" name="back" data-preview-source="#card-preview" rows="4" required>{{$c.Back}}</textarea>
-        </div>
-      </div>
-      <div class="field">
-        <label class="label" for="f-note">Note</label>
-        <textarea class="input textarea-tall" id="f-note" name="note" data-preview-source="#card-preview" rows="2" data-autoresize>{{deref $c.Note}}</textarea>
+      {{/* Assist swap target — same shape as cards_form.html; the hidden
+           version input above stays outside it, so an assist never loses the
+           optimistic-locking token. */}}
+      <div id="card-content-fields" class="stack">
+        {{template "card_content_fields" $d.ContentFields}}
       </div>
 
       {{template "card_preview_toggle"}}
