@@ -210,6 +210,16 @@ client-side and request bodies don't grow with turn count.
 | `content` | TEXT NOT NULL | Raw text; markdown rendering happens at display time. |
 | `created_at` | TEXT | |
 
+Both chat modes share these two tables. `chat_messages` has no mode flag — the only thing that
+distinguishes a topic chat from a study chat is the parent conversation's nullable `schedule_id`, so
+appends, the `ORDER BY id` read, the `updated_at` bump and the TTL sweep are all mode-agnostic.
+`CreateConversation` is the single entry point and branches only on whether a schedule was given,
+and then only in its **authorization join**: the topic-chat insert scopes through `topics.user_id`
+alone, while the study-chat insert walks `schedules → cards → decks → topics` so it verifies both
+that the user owns the topic *and* that the schedule belongs to it (a mismatch inserts zero rows →
+`ErrNotFound`). The modes diverge above this layer, in `internal/claude` — `ChatAboutTopic` versus
+`ChatAboutQuestion` build different prompts from the same stored turns.
+
 Indexes: `idx_conversations_topic_id`, `idx_conversations_schedule_id` (restoring the chat after a
 mid-card refresh), `idx_conversations_updated_at` (the TTL sweep),
 `idx_chat_messages_conversation_id`.
