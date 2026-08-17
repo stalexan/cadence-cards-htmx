@@ -236,6 +236,7 @@ testable without waiting for midnight.
 
 Schema lives in `internal/store/migrations/` as forward-only numbered `.sql` files — there's no
 separate `schema.sql` to read; the migrations *are* the schema.
+[`DATA_MODEL.md`](DATA_MODEL.md) is the column-level reference for all of it.
 
 ## Package map
 
@@ -330,6 +331,8 @@ the Go side, not just the frontend.
 
 - [`CLAUDE.md`](../CLAUDE.md) — conventions, commands, load-bearing invariants (optimistic
   locking, CSP, client-IP trust) in reference form.
+- [`DATA_MODEL.md`](DATA_MODEL.md) — every table, key and cascade in column-level detail, plus how
+  SQLite itself is used (pragmas, migrations, backups) and what each query pattern costs.
 - [`VERSIONING.md`](VERSIONING.md) — how the release number is embedded and bumped.
 - [`FUTURE_WORK.md`](FUTURE_WORK.md) — considered-and-deferred work (job queue, SSE streaming,
   SQL due-ness, reader pool) with the triggers that would make each worth building, and what was

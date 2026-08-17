@@ -11,7 +11,9 @@ up, no NPM, no build step.
           right explaining a Spanish subjunctive answer">
 
 New to this codebase? [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) walks through how the app is
-put together, request flow, and one feature traced end to end.
+put together, request flow, and one feature traced end to end;
+[`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) is the table-by-table schema reference and how SQLite is
+used.
 
 ## Features
 

@@ -93,6 +93,7 @@ and HTMX swapping fragments.
   (forward-only; add `0002_*.sql` etc., never edit an applied migration).  YAML import goes through
   `sm2.RoundEasiness` in `setScheduleState`, so a Svelte export's raw float64 easiness cannot
   reintroduce the drift `0005_round_easiness.sql` cleaned out of existing rows.
+  `docs/DATA_MODEL.md` is the column-level reference for every table and for how SQLite is used.
 - `internal/ratelimit/` — in-memory port of the Svelte rate limiter (general
   1000 req/15 min per IP; auth 3 fails/30 min; IP cooldown/lockout; account lockout). Constants
   mirror `rate-limiter.ts` — keep them in sync conceptually.
