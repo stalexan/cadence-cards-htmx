@@ -337,19 +337,7 @@ func (s *Server) topicExportYAML(r *http.Request) (string, string, error) {
 				Cards:           make([]yamlio.ExportCard, 0, len(byDeck[d.ID])),
 			}
 			for _, c := range byDeck[d.ID] {
-				ec := yamlio.ExportCard{
-					Front: c.Front, Back: c.Back, Note: c.Note, Priority: c.Priority, Tags: c.Tags,
-				}
-				if fwd := c.ForwardSchedule(); fwd != nil {
-					ec.Forward = fwd.State()
-				}
-				// Same guard as deckExportYAML: a dormant reverse schedule
-				// must not leak Reverse* fields and flip the deck on re-import.
-				if rev := c.ReverseSchedule(); rev != nil && d.IsBidirectional {
-					st := rev.State()
-					ec.Reverse = &st
-				}
-				ed.Cards = append(ed.Cards, ec)
+				ed.Cards = append(ed.Cards, exportCard(c, d.IsBidirectional))
 			}
 			cardCount += len(ed.Cards)
 			exportDecks[i] = ed

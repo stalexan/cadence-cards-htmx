@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"cadence-cards/internal/claude"
+	"cadence-cards/internal/markdown"
 	"cadence-cards/internal/sm2"
 	"cadence-cards/internal/store"
+	"cadence-cards/internal/yamlio"
 )
 
 const cardsPerPage = 25 // matches the Svelte cards page
@@ -622,6 +624,77 @@ func (s *Server) handleCardDelete(w http.ResponseWriter, r *http.Request) {
 		dest = "/cards"
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// handleCardExportPreview serves the single-card YAML without the attachment
+// header, so the share dialog can hx-get it into a readonly textarea (same
+// split as the deck and topic exports).
+func (s *Server) handleCardExportPreview(w http.ResponseWriter, r *http.Request) {
+	content, _, err := s.cardExportYAML(r)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(content))
+}
+
+func (s *Server) handleCardExport(w http.ResponseWriter, r *http.Request) {
+	content, card, err := s.cardExportYAML(r)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/yaml")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+cardFilename(card)+`"`)
+	w.Write([]byte(content))
+}
+
+// cardExportYAML builds a one-card export in the *deck* format, so it imports
+// through the existing "add cards to an existing deck" path with no new parser.
+// Honours ?includeSm2Params like the other exports.
+func (s *Server) cardExportYAML(r *http.Request) (string, store.Card, error) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		return "", store.Card{}, store.ErrNotFound
+	}
+	user := userFrom(r)
+	card, err := s.store.GetCard(r.Context(), user.ID, id)
+	if err != nil {
+		return "", store.Card{}, err
+	}
+
+	// The deck name in the header is the card's own deck: the file is a deck
+	// export that happens to hold one card.
+	meta := &yamlio.Metadata{
+		FormatVersion: "1.0",
+		DeckName:      card.DeckName,
+		CreatorName:   user.Name,
+		ExportDate:    time.Now().UTC().Format("2006-01-02"),
+		CardCount:     1,
+	}
+	content, err := yamlio.Export(
+		[]yamlio.ExportCard{exportCard(card, card.IsBidirectional)},
+		meta, r.URL.Query().Get("includeSm2Params") == "true")
+	if err != nil {
+		return "", store.Card{}, err
+	}
+	return content, card, nil
+}
+
+// cardFilename names the download after the card's front text, reduced to one
+// line first so markup never reaches the filename. A front made entirely of
+// punctuation sanitizes to nothing useful, so fall back to the card's ID.
+func cardFilename(card store.Card) string {
+	front := []rune(markdown.PlainText(card.Front))
+	if len(front) > 40 {
+		front = front[:40]
+	}
+	name := strings.Trim(sanitizeFilename(string(front)), "_")
+	if name == "" {
+		name = "card_" + itoa(card.ID)
+	}
+	return name + "_card.yaml"
 }
 
 func (s *Server) handleScheduleReset(w http.ResponseWriter, r *http.Request) {

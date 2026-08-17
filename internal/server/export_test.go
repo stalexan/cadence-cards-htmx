@@ -111,6 +111,117 @@ func TestDeckExportOmitsDormantReverseSchedule(t *testing.T) {
 	}
 }
 
+// A single card exports in the deck format, so it can be imported into any
+// deck; the filename comes from the front text, stripped of markdown.
+func TestCardExport(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+
+	w := app.do("GET", "/cards/"+itoa(card.ID)+"/export", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("export = %d", w.Code)
+	}
+	if got := w.Header().Get("Content-Disposition"); got != `attachment; filename="hola_card.yaml"` {
+		t.Errorf("Content-Disposition = %q", got)
+	}
+	if got := w.Header().Get("Content-Type"); got != "text/yaml" {
+		t.Errorf("Content-Type = %q", got)
+	}
+	body := w.Body.String()
+	for _, want := range []string{"# Deck: Vocab", "# Cards: 1", "Front: hola", "Back: hello"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("export missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "Easiness:") {
+		t.Errorf("export without SM-2 leaked study params: %s", body)
+	}
+
+	w = app.do("GET", "/cards/"+itoa(card.ID)+"/export?includeSm2Params=true", nil)
+	if !strings.Contains(w.Body.String(), "Easiness: 2.5") {
+		t.Errorf("export with SM-2 missing params: %s", w.Body.String())
+	}
+
+	// The preview serves the same bytes as text/plain, no attachment header.
+	w = app.do("GET", "/cards/"+itoa(card.ID)+"/export-preview", nil)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Disposition") != "" {
+		t.Errorf("preview = %d, disposition %q", w.Code, w.Header().Get("Content-Disposition"))
+	}
+}
+
+// The export is a deck file, so it must survive a round trip through /import
+// back into a deck.
+func TestCardExportRoundTrips(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+	ctx := context.Background()
+
+	yaml := app.do("GET", "/cards/"+itoa(card.ID)+"/export?includeSm2Params=true", nil).Body.String()
+	w := app.do("POST", "/import", url.Values{
+		"deckId": {itoa(card.DeckID)}, "yamlContent": {yaml},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("import = %d: %s", w.Code, w.Body.String())
+	}
+
+	u, _, err := app.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards, _, err := app.store.ListCards(ctx, u.ID, store.CardListParams{DeckID: &card.DeckID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 2 {
+		t.Fatalf("after importing the card back: %d cards, want 2", len(cards))
+	}
+}
+
+// Markdown in the front must not reach the filename, and a front that
+// sanitizes to nothing falls back to the card ID.
+func TestCardExportFilename(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seedMarkdownCard() // Front: "**bold** front"
+
+	w := app.do("GET", "/cards/"+itoa(card.ID)+"/export", nil)
+	if got := w.Header().Get("Content-Disposition"); got != `attachment; filename="bold_front_card.yaml"` {
+		t.Errorf("Content-Disposition = %q", got)
+	}
+
+	ctx := context.Background()
+	u, _, err := app.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	punct, err := app.store.CreateCard(ctx, u.ID, store.CardParams{
+		DeckID: card.DeckID, Front: "?!", Back: "b", Priority: sm2.PriorityC,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w = app.do("GET", "/cards/"+itoa(punct.ID)+"/export", nil)
+	want := `attachment; filename="card_` + itoa(punct.ID) + `_card.yaml"`
+	if got := w.Header().Get("Content-Disposition"); got != want {
+		t.Errorf("Content-Disposition = %q, want %q", got, want)
+	}
+}
+
+// Another user's card must 404 rather than export.
+func TestCardExportIsScopedToOwner(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+
+	app.login("other@example.com")
+	w := app.do("GET", "/cards/"+itoa(card.ID)+"/export", nil)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("other user's export = %d, want 404", w.Code)
+	}
+}
+
 func TestTopicExport(t *testing.T) {
 	app := newTestApp(t, nil)
 	app.login("t@example.com")

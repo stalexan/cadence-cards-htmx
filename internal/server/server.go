@@ -117,6 +117,8 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	mux.HandleFunc("GET /cards/{id}", auth(s.handleCardShow))
 	mux.HandleFunc("POST /cards/{id}", auth(s.handleCardUpdate))
 	mux.HandleFunc("POST /cards/{id}/delete", auth(s.handleCardDelete))
+	mux.HandleFunc("GET /cards/{id}/export", auth(s.handleCardExport))
+	mux.HandleFunc("GET /cards/{id}/export-preview", auth(s.handleCardExportPreview))
 	mux.HandleFunc("POST /schedules/{id}/reset", auth(s.handleScheduleReset))
 
 	mux.HandleFunc("GET /import", auth(s.handleImportPage))

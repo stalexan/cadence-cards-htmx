@@ -259,21 +259,7 @@ func (s *Server) deckExportYAML(r *http.Request) (string, string, error) {
 
 	exports := make([]yamlio.ExportCard, len(cards))
 	for i, c := range cards {
-		ec := yamlio.ExportCard{
-			Front: c.Front, Back: c.Back, Note: c.Note, Priority: c.Priority, Tags: c.Tags,
-		}
-		if fwd := c.ForwardSchedule(); fwd != nil {
-			ec.Forward = fwd.State()
-		}
-		// Only for currently-bidirectional decks: a dormant reverse schedule
-		// (left behind when bidirectionality was switched off) must not leak
-		// Reverse* fields, which would flip the target deck to bidirectional
-		// on re-import.
-		if rev := c.ReverseSchedule(); rev != nil && deck.IsBidirectional {
-			st := rev.State()
-			ec.Reverse = &st
-		}
-		exports[i] = ec
+		exports[i] = exportCard(c, deck.IsBidirectional)
 	}
 
 	meta := &yamlio.Metadata{
@@ -288,6 +274,26 @@ func (s *Server) deckExportYAML(r *http.Request) (string, string, error) {
 		return "", "", err
 	}
 	return content, deck.Name, nil
+}
+
+// exportCard converts one stored card into its YAML shape. Shared by the deck,
+// topic, and single-card exports so the three produce identical card blocks.
+// bidirectional is the *deck's* current setting, not the card's schedule count:
+// a dormant reverse schedule (left behind when bidirectionality was switched
+// off) must not leak Reverse* fields, which would flip the target deck to
+// bidirectional on re-import.
+func exportCard(c store.Card, bidirectional bool) yamlio.ExportCard {
+	ec := yamlio.ExportCard{
+		Front: c.Front, Back: c.Back, Note: c.Note, Priority: c.Priority, Tags: c.Tags,
+	}
+	if fwd := c.ForwardSchedule(); fwd != nil {
+		ec.Forward = fwd.State()
+	}
+	if rev := c.ReverseSchedule(); rev != nil && bidirectional {
+		st := rev.State()
+		ec.Reverse = &st
+	}
+	return ec
 }
 
 // sanitizeFilename ports `name.replace(/[^a-z0-9]/gi, '_').toLowerCase()`.

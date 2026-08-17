@@ -21,6 +21,7 @@
       {{if $d.Editing}}
       <a class="btn btn-sm btn-secondary" href="/cards/{{$c.ID}}">{{template "icon-eye"}}View</a>
       {{else}}
+      <button type="button" class="btn btn-sm btn-primary" data-open-dialog="#share-dialog">{{template "icon-share"}}Share</button>
       <a class="btn btn-sm btn-secondary" href="/cards/{{$c.ID}}?edit=1">{{template "icon-pencil"}}Edit</a>
       {{end}}
       <form method="post" action="/cards/{{$c.ID}}/delete"
@@ -161,4 +162,40 @@
   </div>
   {{end}}
 </div>
+
+{{if not $d.Editing}}
+{{/* Same dialog as the deck export, scoped to one card: the file is a deck
+     export holding a single card, so it imports through the normal
+     "add cards to an existing deck" path. Edit mode hides it — the preview
+     comes from the store, so it would not show unsaved edits. */}}
+<dialog id="share-dialog" class="dialog dialog-2xl"
+        data-export-scope data-export-base="/cards/{{$c.ID}}/export">
+  <div class="dialog-body">
+    <h3 class="dialog-title">Export “{{truncate 60 (plaintext $c.Front)}}”</h3>
+    <div class="dialog-content">
+      <p class="dialog-message">Download this card as YAML, or copy it below. It can be imported into any deck here or in another Cadence Cards instance.</p>
+      <label class="check-field share-toggle">
+        {{/* textContent, never innerHTML: the response is raw YAML, and HTML
+             parsing would mangle card content like "Vector<int>". */}}
+        <input type="checkbox" id="share-include-sm2" name="includeSm2Params" value="true"
+               data-export-toggle
+               hx-get="/cards/{{$c.ID}}/export-preview" hx-target="#share-yaml" hx-swap="textContent"
+               hx-trigger="change">
+        <span class="check-label">Include SM-2 study progress</span>
+      </label>
+      {{/* dialog-opened, not revealed: a closed dialog's zero rect passes
+           htmx's viewport check, so "revealed" would fire eagerly. */}}
+      <textarea class="input mono share-yaml" id="share-yaml" readonly rows="12"
+                hx-get="/cards/{{$c.ID}}/export-preview"
+                hx-trigger="dialog-opened once from:closest dialog" hx-swap="textContent"></textarea>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <a class="btn btn-primary" id="share-download" data-export-download
+       href="/cards/{{$c.ID}}/export" download>{{template "icon-download"}} Download YAML</a>
+    <button type="button" class="btn btn-secondary" data-copy-target="#share-yaml">{{template "icon-clipboard"}} Copy</button>
+    <button type="button" class="btn btn-secondary" data-close-dialog>Close</button>
+  </div>
+</dialog>
+{{end}}
 {{end}}
