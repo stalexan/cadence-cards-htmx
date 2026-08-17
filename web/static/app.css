@@ -469,6 +469,9 @@ a:hover .entity-title { color: var(--indigo-600); }
 /* Row of small tinted pill buttons in a detail header. */
 .pill-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .pill-actions .btn .icon { width: 1rem; height: 1rem; }
+/* Two or more buttons on the right of a .page-header, wrapping together rather
+   than letting one drop away from the other. */
+.header-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
 .config-heading {
   margin-bottom: var(--space-4);
@@ -641,6 +644,11 @@ a:hover .entity-title { color: var(--indigo-600); }
   font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--gray-500);
 }
 .empty-state .btn { margin-top: var(--space-6); }
+/* Two calls to action side by side, wrapping rather than shrinking on a narrow
+   screen. The buttons keep their own top margin, so the row adds none. */
+.empty-actions {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3);
+}
 
 
 /* ---------- Buttons ----------
@@ -847,15 +855,20 @@ form[data-busy] .btn-busy { display: inline; }
 .alert-error   { background: var(--red-50);   color: var(--red-700); }
 .alert-success { background: var(--green-50); color: var(--green-700); }
 .alert-warning { background: var(--yellow-50); color: var(--yellow-700); }
+/* Informational, in the app's own hue: nothing has gone wrong and nothing has
+   succeeded — the first-run nudge on an empty dashboard. */
+.alert-info    { background: var(--indigo-50); color: var(--indigo-700); }
 .alert > .icon { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
 .alert-error   > .icon { color: var(--red-400); }
 .alert-success > .icon { color: var(--green-400); }
 .alert-warning > .icon { color: var(--yellow-500); }
+.alert-info    > .icon { color: var(--indigo-400); }
 .alert-body { min-width: 0; }
 .alert-title { font-weight: 500; }
 .alert-error   .alert-title { color: var(--red-800); }
 .alert-success .alert-title { color: var(--green-800); }
 .alert-warning .alert-title { color: var(--yellow-800); }
+.alert-info    .alert-title { color: var(--indigo-800); }
 /* Only separated from the title when there is one. */
 .alert-title + .alert-text { margin-top: var(--space-2); }
 .alert-compact {
@@ -1428,6 +1441,22 @@ dialog::backdrop { background: rgb(107 114 128 / 0.3); }  /* bg-gray-500/30 */
     padding-left: var(--space-6); padding-right: var(--space-6);
   }
 }
+
+/* ---------- Sample topics gallery ----------
+   Reuses the topic tile (.panel + .grid-cards); only the blurb and the inline
+   YAML preview are new. */
+.sample-blurb {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--gray-600);
+}
+.sample-preview { margin-top: var(--space-4); }
+/* The disclosure body's top padding is tuned for stacked form fields; a lone
+   textarea needs it back. */
+.sample-preview .disclosure-body { padding-top: var(--space-4); }
+.sample-preview .share-yaml { margin-top: 0; }
+/* The add form is a spinner plus a button, so it needs the row treatment the
+   bare .footer-end form does not give it. */
+.footer-end form { align-items: center; gap: var(--space-2); }
 
 /* ---------- Misc ---------- */
 .import-errors { color: var(--red-800); font-size: 0.85rem; }

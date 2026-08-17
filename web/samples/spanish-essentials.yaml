@@ -1,0 +1,155 @@
+Provenance:
+  Author: Cadence Cards
+  License: CC0-1.0
+  Source: Bundled with Cadence Cards
+Topic:
+  Name: Spanish Essentials
+  TopicDescription: everyday Latin American Spanish for a beginner
+  Expertise: patient Spanish tutor
+  Focus: vocabulary, gender, and how words are actually used
+  ContextType: cultural context
+  Example: |-
+    H: Why is it "el agua" if agua is feminine?
+
+    A: Good catch — agua really is feminine, and it keeps its feminine
+    agreement: *el agua fría*, not *el agua frío*.
+
+    Singular nouns that begin with a stressed "a" sound take **el** instead of
+    **la**, purely so the two a-sounds don't run together. The same happens with
+    *el águila* (the eagle) and *el hacha* (the axe).
+
+    In the plural the reason disappears and **las** comes back: *las aguas*,
+    *las águilas*.
+  Question: |-
+    Ask for the other side of the card in a natural sentence, so the learner
+    recalls the word in context rather than as an isolated item.
+
+    Do not reveal the answer, and do not translate it in the question.
+Decks:
+  - Name: Everyday Words
+    Field1Label: English
+    Field2Label: Spanish
+    IsBidirectional: true
+    Cards:
+      - Front: hello
+        Back: hola
+        Priority: A
+        Tags:
+          - greetings
+      - Front: please
+        Back: por favor
+        Priority: A
+        Tags:
+          - greetings
+      - Front: thank you
+        Back: gracias
+        Priority: A
+        Tags:
+          - greetings
+      - Front: good morning
+        Back: buenos días
+        Note: Switches to **buenas tardes** after midday and **buenas noches** after dark. All three are plural in Spanish.
+        Priority: A
+        Tags:
+          - greetings
+      - Front: excuse me / sorry
+        Back: perdón
+        Note: "**Perdón** apologises for something you did. **Con permiso** asks to get past someone — squeezing through a crowd, leaving a table."
+        Priority: B
+        Tags:
+          - greetings
+      - Front: water
+        Back: el agua
+        Note: Feminine, but takes **el** in the singular because it starts with a stressed *a*. The adjective stays feminine — *el agua fría* — and the plural is *las aguas*.
+        Priority: A
+        Tags:
+          - nouns
+          - food
+      - Front: bread
+        Back: el pan
+        Priority: B
+        Tags:
+          - nouns
+          - food
+      - Front: house
+        Back: la casa
+        Priority: A
+        Tags:
+          - nouns
+      - Front: dog
+        Back: el perro
+        Note: "**la perra** for a female dog, though it is also an insult — *la perrita* is the safer diminutive."
+        Priority: B
+        Tags:
+          - nouns
+          - animals
+      - Front: book
+        Back: el libro
+        Priority: B
+        Tags:
+          - nouns
+      - Front: to speak
+        Back: hablar
+        Note: One of the three regular verb endings — **-ar** (hablar), **-er** (comer), **-ir** (vivir). Which ending a verb has decides how it conjugates.
+        Priority: A
+        Tags:
+          - verbs
+      - Front: to eat
+        Back: comer
+        Priority: A
+        Tags:
+          - verbs
+      - Front: to live
+        Back: vivir
+        Priority: B
+        Tags:
+          - verbs
+      - Front: to be (a permanent quality — who or what something is)
+        Back: ser
+        Note: |-
+          Spanish splits "to be" in two.
+
+          **Ser** is for what something fundamentally is: *soy mexicana*, *es
+          médico*, *la nieve es blanca*.
+        Priority: A
+        Tags:
+          - verbs
+      - Front: to be (a state or a location — how or where something is)
+        Back: estar
+        Note: |-
+          **Estar** is for conditions and places: *estoy cansado* (I'm tired),
+          *está en la cocina* (it's in the kitchen).
+
+          The contrast is the whole point: *es aburrido* = he is boring;
+          *está aburrido* = he is bored.
+        Priority: A
+        Tags:
+          - verbs
+      - Front: today
+        Back: hoy
+        Priority: B
+        Tags:
+          - time
+      - Front: tomorrow
+        Back: mañana
+        Note: The same word means "morning" when it takes an article — *mañana* = tomorrow, *la mañana* = the morning. *Mañana por la mañana* is tomorrow morning.
+        Priority: A
+        Tags:
+          - time
+      - Front: how much does it cost?
+        Back: ¿cuánto cuesta?
+        Priority: A
+        Tags:
+          - phrases
+      - Front: where is the bathroom?
+        Back: ¿dónde está el baño?
+        Note: "**Está**, not *es* — a location, so it takes *estar*."
+        Priority: A
+        Tags:
+          - phrases
+      - Front: I don't understand
+        Back: no entiendo
+        Note: Worth learning before almost anything else. Follow it with *¿puede repetirlo, por favor?* — can you repeat that?
+        Priority: A
+        Tags:
+          - phrases

@@ -4,6 +4,22 @@
 <div class="stack-6">
   <h1>Welcome back{{with .User}}{{if .Name}}, {{.Name}}{{end}}{{end}}</h1>
 
+  {{/* First-run nudge. An account with no topics sees nothing here but zeroes,
+       and "Create Topic" asks it to invent a subject and a tutor configuration
+       before the app has done anything for it. A sample gets it to a real
+       study session first. Disappears for good once a topic exists. */}}
+  {{if eq $d.TotalTopics 0}}
+  <div class="alert alert-info">
+    {{template "icon-sparkles"}}
+    <div class="alert-body">
+      <h3 class="alert-title">Nothing to study yet</h3>
+      <div class="alert-text">Add a <a class="entity-link" href="/samples">ready-made sample
+        topic</a> and start a real study session in a minute, or
+        <a class="entity-link" href="/topics/new">build your own</a> from scratch.</div>
+    </div>
+  </div>
+  {{end}}
+
   {{/* Four stat cards. Each is chip + dl + tinted footer link, in its own hue.
        Written out rather than looped: Go templates can't take a computed
        {{template}} name, so the icon per card has to be literal. */}}

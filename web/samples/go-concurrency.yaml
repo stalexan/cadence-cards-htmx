@@ -1,0 +1,177 @@
+Provenance:
+  Author: Cadence Cards
+  License: CC0-1.0
+  Source: Bundled with Cadence Cards
+Topic:
+  Name: Go Concurrency
+  TopicDescription: goroutines, channels, and the sync package in Go
+  Expertise: Go programmer
+  Focus: concurrency primitives and the mistakes they invite
+  ContextType: short code examples
+  Example: |-
+    H: Why does my program exit before my goroutines print anything?
+
+    A: Because nothing is waiting for them.
+
+    When `main` returns, the program exits immediately and every other goroutine
+    dies wherever it happens to be — there is no "wait for children" step.
+
+    The fix is to make the waiting explicit, usually with a `sync.WaitGroup`:
+
+    ```go
+    var wg sync.WaitGroup
+    for _, u := range urls {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            fetch(u)
+        }()
+    }
+    wg.Wait()
+    ```
+
+    `time.Sleep` appears to fix it and does not — it just picks a duration that
+    is usually long enough.
+  Question: |-
+    Ask a question that tests whether the learner can predict what the runtime
+    does, rather than whether they can recite a definition. Where it helps, put
+    a short snippet in the question and ask what it prints or whether it
+    deadlocks.
+
+    Do not reveal what is on the back of the card.
+Decks:
+  - Name: Goroutines and Channels
+    Field1Label: Question
+    Field2Label: Answer
+    IsBidirectional: false
+    Cards:
+      - Front: What does `go f(x)` do?
+        Back: |-
+          Starts `f` in a new goroutine and returns **immediately** — the caller
+          does not wait for it and cannot get its return value.
+        Note: The arguments are evaluated in the *calling* goroutine, at the moment of the `go` statement, not later inside the new one.
+        Priority: A
+        Tags:
+          - goroutines
+      - Front: What is the zero value of a channel, and what happens if you send on it?
+        Back: |-
+          The zero value is `nil`. A send or receive on a nil channel **blocks
+          forever**.
+        Note: |-
+          Useful on purpose in a `select`: setting a channel variable to nil
+          disables that case, so a loop can stop listening to one source without
+          restructuring.
+        Priority: B
+        Tags:
+          - channels
+      - Front: What is the difference between an unbuffered and a buffered channel?
+        Back: |-
+          An **unbuffered** channel (`make(chan T)`) hands the value over
+          directly — the sender blocks until a receiver is ready.
+
+          A **buffered** channel (`make(chan T, n)`) accepts up to `n` values
+          before the sender blocks.
+        Note: An unbuffered send is a synchronisation point, not just a transfer — when it completes, you know a receiver reached that line.
+        Priority: A
+        Tags:
+          - channels
+      - Front: What does receiving from a closed channel give you?
+        Back: |-
+          It returns immediately with the element type's **zero value**, forever.
+          The two-value form tells you which it was:
+
+          ```go
+          v, ok := <-ch // ok == false once the channel is closed and drained
+          ```
+        Note: A `for range` over a channel ends when the channel is closed, which is the usual way to signal "no more values".
+        Priority: A
+        Tags:
+          - channels
+      - Front: What happens if you send on a closed channel, or close one twice?
+        Back: Both **panic**.
+        Note: Which is why closing is the *sender's* job, never the receiver's — a receiver cannot know whether another sender is still running.
+        Priority: A
+        Tags:
+          - channels
+      - Front: What does a `select` with a `default` case do?
+        Back: |-
+          It becomes **non-blocking**: if no other case is ready right now, the
+          `default` runs immediately.
+
+          ```go
+          select {
+          case v := <-ch:
+              use(v)
+          default:
+              // nothing waiting; carry on
+          }
+          ```
+        Priority: B
+        Tags:
+          - channels
+      - Front: What does `select` do when several cases are ready at once?
+        Back: It picks one **uniformly at random**, so no case can starve the others.
+        Priority: C
+        Tags:
+          - channels
+      - Front: What is a `sync.WaitGroup` for, and where does `Add` belong?
+        Back: |-
+          It waits for a set of goroutines to finish. `Add` belongs in the
+          **calling** goroutine, before the `go` statement:
+
+          ```go
+          wg.Add(1)
+          go func() {
+              defer wg.Done()
+              work()
+          }()
+          wg.Wait()
+          ```
+        Note: Calling `Add` inside the new goroutine is a race — `Wait` may run before it, see a count of zero, and return early.
+        Priority: A
+        Tags:
+          - sync
+      - Front: When is `sync.RWMutex` worth using over `sync.Mutex`?
+        Back: |-
+          When reads greatly outnumber writes and the critical section is long
+          enough to matter — many readers can hold `RLock` at once, while a
+          writer needs exclusive `Lock`.
+        Note: For short critical sections a plain `Mutex` is usually faster; `RWMutex` has more bookkeeping, and it is not reentrant either.
+        Priority: B
+        Tags:
+          - sync
+      - Front: What does `context.WithCancel` return, and who must call what?
+        Back: |-
+          A derived context and a `cancel` function:
+
+          ```go
+          ctx, cancel := context.WithCancel(parent)
+          defer cancel()
+          ```
+
+          `cancel` must be called — `defer` is the usual way — or the context
+          leaks along with anything waiting on `ctx.Done()`.
+        Note: Cancelling a context cancels every context derived from it, so cancellation propagates down a call tree without any extra plumbing.
+        Priority: A
+        Tags:
+          - context
+      - Front: How do you find data races in Go?
+        Back: |-
+          Run with the race detector:
+
+          ```sh
+          go test -race ./...
+          go run -race .
+          ```
+        Note: It only reports races that actually happen during the run, so it finds what your tests exercise and nothing else. It also slows execution down considerably, which is why it is not on by default.
+        Priority: B
+        Tags:
+          - tooling
+      - Front: What does "Don't communicate by sharing memory; share memory by communicating" mean in practice?
+        Back: |-
+          Prefer passing a value to one owner over a channel to letting several
+          goroutines touch the same variable behind a lock.
+        Note: It is a default, not a rule. A mutex around a small shared counter or map is often simpler and faster than routing it through a channel — the Go standard library uses both.
+        Priority: C
+        Tags:
+          - design

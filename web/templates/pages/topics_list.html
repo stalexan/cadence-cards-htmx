@@ -1,8 +1,14 @@
 {{define "title"}}Topics — Cadence Cards{{end}}
 {{define "content"}}
+{{/* Samples sits in the header, not only in the empty state below: an account
+     that already has topics never renders that empty state, which left the
+     gallery reachable only by typing the URL. */}}
 <div class="page-header">
   <h1>Topics</h1>
-  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} New Topic</a>
+  <div class="header-actions">
+    <a class="btn btn-secondary" href="/samples">{{template "icon-sparkles"}} Samples</a>
+    <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} New Topic</a>
+  </div>
 </div>
 {{if .Data}}
 <div class="grid-cards">
@@ -39,8 +45,12 @@
 <div class="empty-state">
   {{template "icon-folder"}}
   <h3>No topics yet</h3>
-  <p>Topics group your decks and configure the Claude study assistant.</p>
-  <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} New Topic</a>
+  <p>Topics group your decks and configure the Claude study assistant.
+    Not sure where to start? Add a ready-made one.</p>
+  <div class="empty-actions">
+    <a class="btn btn-primary" href="/topics/new">{{template "icon-plus"}} New Topic</a>
+    <a class="btn btn-secondary" href="/samples">{{template "icon-sparkles"}} Browse samples</a>
+  </div>
 </div>
 {{end}}
 {{end}}

@@ -294,18 +294,13 @@ func (s *Server) importCards(w http.ResponseWriter, r *http.Request, userID int6
 	s.fragment(w, http.StatusOK, "import_result", result)
 }
 
-// importTopic handles the topic format: a new topic is created, along with any
-// decks and cards the file carries. The target-deck select is ignored.
-func (s *Server) importTopic(w http.ResponseWriter, r *http.Request, userID int64, yamlContent string) {
-	parsed, err := yamlio.ImportTopic(yamlContent)
-	if err != nil {
-		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
-			importResultData{Message: err.Error()})
-		return
-	}
-
-	result := importResultData{IsTopic: true, Errors: parsed.Errors, FailedCount: len(parsed.Errors)}
-
+// topicImportParams maps a parsed topic file onto store params, recording any
+// per-card failures on result as it goes.
+//
+// Shared by the pasted-file route and the /samples route so a bundled sample
+// travels exactly the path a pasted file does — there is no second, quieter
+// importer that could accept something the real one rejects.
+func topicImportParams(parsed yamlio.ImportedTopic, result *importResultData) store.TopicImportParams {
 	p := store.TopicImportParams{
 		Topic: store.TopicParams{
 			Name:             parsed.Config.Name,
@@ -360,6 +355,21 @@ func (s *Server) importTopic(w http.ResponseWriter, r *http.Request, userID int6
 		}
 		p.Decks = append(p.Decks, deck)
 	}
+	return p
+}
+
+// importTopic handles the topic format: a new topic is created, along with any
+// decks and cards the file carries. The target-deck select is ignored.
+func (s *Server) importTopic(w http.ResponseWriter, r *http.Request, userID int64, yamlContent string) {
+	parsed, err := yamlio.ImportTopic(yamlContent)
+	if err != nil {
+		s.fragment(w, http.StatusUnprocessableEntity, "import_result",
+			importResultData{Message: err.Error()})
+		return
+	}
+
+	result := importResultData{IsTopic: true, Errors: parsed.Errors, FailedCount: len(parsed.Errors)}
+	p := topicImportParams(parsed, &result)
 
 	res, err := s.store.ImportTopic(r.Context(), userID, p)
 	if err != nil {

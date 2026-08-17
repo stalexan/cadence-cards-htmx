@@ -1,0 +1,122 @@
+Provenance:
+  Author: Cadence Cards
+  License: CC0-1.0
+  Source: Bundled with Cadence Cards
+Topic:
+  Name: Getting Started with Cadence Cards
+  TopicDescription: how Cadence Cards works — spaced repetition, topics, decks, and study sessions
+  Expertise: guide to this flashcard app
+  Focus: how spaced repetition works and how to get the most out of the app
+  ContextType: practical tips
+  Example: |-
+    H: Why did that card come back so soon?
+
+    A: A card's next review date comes from the grade you gave it last time.
+
+    Grading a card **Incorrect** resets it: its interval goes back to 1 day and
+    its repetition count to 0, so you will see it again tomorrow. That is the
+    algorithm working — the cards you keep missing are exactly the ones worth
+    repeating, and the ones you know drift further apart on their own.
+
+    If a card keeps resetting, it is usually a sign the card is doing too much
+    at once. Splitting it into two narrower cards is almost always better than
+    trying harder to memorize the big one.
+  Question: |-
+    Ask a question that checks whether the learner understands how the app
+    behaves, not whether they can recite the wording on the card.
+
+    Do not reveal what is on the back of the card.
+Decks:
+  - Name: How It Works
+    Field1Label: Question
+    Field2Label: Answer
+    IsBidirectional: false
+    Cards:
+      - Front: What are the three levels of the Cadence Cards hierarchy, from largest to smallest?
+        Back: |-
+          **Topic → Deck → Card.**
+
+          A topic groups decks and holds the Claude tutor settings. A deck groups
+          cards and sets the study direction. A card is one thing you are trying
+          to remember.
+        Priority: A
+        Tags:
+          - basics
+      - Front: What does a topic hold besides its decks?
+        Back: |-
+          The **Claude tutor configuration** — the topic's name, a description of
+          the subject, the expertise the tutor should have, what to focus on, the
+          kind of extra context to offer, an example exchange, and a question
+          prompt.
+        Note: Leave any of them blank and a sensible default is used. The topic form shows those defaults as input placeholders, so an empty field tells you what the tutor will be told anyway.
+        Priority: A
+        Tags:
+          - basics
+      - Front: What are the three grades you can give a card?
+        Back: |-
+          - **Perfect Recall** — I knew it immediately
+          - **Correct with Hesitation** — I had to think
+          - **Incorrect** — I didn't remember
+        Note: There is no separate "easy" or "again" button. Three grades map onto the SM-2 quality scale as 5, 4 and 0.
+        Priority: A
+        Tags:
+          - studying
+      - Front: What happens to a card's schedule when you grade it Incorrect?
+        Back: |-
+          Its interval resets to **1 day** and its repetition count goes back to
+          **0**, so it comes around again tomorrow. Its easiness factor drops as
+          well, which makes its future intervals grow more slowly.
+        Note: Easiness never falls below 1.3, and it has no upper limit.
+        Priority: A
+        Tags:
+          - studying
+      - Front: How far apart are a card's first two successful reviews?
+        Back: |-
+          **1 day**, then **6 days**.
+
+          From the third repetition on, the next interval is the previous
+          interval multiplied by the card's easiness factor — so well-known cards
+          spread out quickly.
+        Priority: B
+        Tags:
+          - studying
+      - Front: What does it mean for a deck to be bidirectional?
+        Back: |-
+          Every card in it is studied **both ways** — front to back and back to
+          front — and each direction keeps its **own independent schedule**.
+        Note: This is what makes language decks work. You can know *perro → dog* perfectly and still be shaky on *dog → perro*, and the app schedules the two separately.
+        Priority: A
+        Tags:
+          - decks
+      - Front: What are the A, B and C priorities for?
+        Back: |-
+          They mark how important a card is to you. A study session can be
+          filtered to a single priority, so you can drill just your A cards when
+          you only have a few minutes.
+        Priority: B
+        Tags:
+          - studying
+      - Front: Can card content use markdown?
+        Back: |-
+          Yes. **Front**, **Back** and **Note** are all markdown — emphasis,
+          lists, tables and fenced code blocks all render.
+        Note: Raw HTML is stripped rather than displayed, and remote images do not load, so a card can never pull in anything from another site.
+        Priority: B
+        Tags:
+          - cards
+      - Front: What are the two ways to chat with Claude here?
+        Back: |-
+          **Topic chat** — an open conversation about the subject — and **study
+          chat**, which is tied to the specific card in front of you and to the
+          practice question generated for it.
+        Priority: B
+        Tags:
+          - claude
+      - Front: How do you move cards between accounts, or back a deck up outside the app?
+        Back: |-
+          Export **YAML** — from a single card, a whole deck, or an entire topic —
+          then paste or drop the file into the Import page.
+        Note: The import page detects which kind of file you pasted and tells you what it is about to do before you commit to it. A topic file brings its own decks, so it works even in an empty account.
+        Priority: C
+        Tags:
+          - import-export

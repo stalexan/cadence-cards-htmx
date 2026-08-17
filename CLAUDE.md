@@ -128,6 +128,17 @@ and HTMX swapping fragments.
   otherwise the SDK spends a round-trip on its own credential discovery and fails with a local
   error carrying no HTTP status, which `classifyAPIError` cannot recognise — so every AI feature
   would report a generic "try again" for a condition retrying can never fix.
+- `internal/samples/` — the bundled sample topics behind `GET /samples`, one topic-format YAML file
+  each in `web/samples/` (embedded as `web.Samples`, deliberately **outside** `web.Static` so they
+  never feed `assetVersion`). There is **no manifest**: the catalog is built by parsing the files
+  with the same `yamlio.ImportTopic` the import route runs, so title/blurb/counts cannot drift from
+  what adding one produces, and dropping a file in the directory is the whole of adding a gallery
+  entry (filename order = display order, slug = basename). Adding a sample goes through the shared
+  `topicImportParams` + `store.ImportTopic` — there is no second, quieter importer — so a repeat add
+  auto-suffixes the name rather than failing. `samples_test.go` is the gate: every file must parse
+  clean, fill all seven prompt fields, carry `Provenance`, and contain **no SM-2 state**, so cards
+  arrive new and the first study session is a full one. A broken sample fails `go test` (and the
+  Docker build), never a new account's first click.
 - `internal/pregen/` — nightly Message Batches job pre-generating questions for cards due within
   24h (`generated_questions` table, consumed on serve, invalidated on card edit/reset).
   Deliberately **not** on the `server.AI` interface — handlers never batch, so handler tests stay
@@ -151,7 +162,8 @@ and HTMX swapping fragments.
 - `web/` — `templates/layout/` (base = app shell with sidebar, auth = centered card),
   `templates/pages/` (each defines `title` + `content`), `templates/partials/` (named `{{define}}`s
   used as HTMX fragments), `static/` (vendored `htmx.js` 2.0.10, unminified, `app.js`, `app.css`,
-  favicon).  With no package manager, `web/VENDOR.md` **is** the lockfile for the vendored files —
+  favicon), `samples/` (the bundled sample topics — see `internal/samples/`).
+  With no package manager, `web/VENDOR.md` **is** the lockfile for the vendored files —
   version, source URL, SHA-256 — and `web/vendor_test.go` fails the build (including the Docker
   build) when the record and the embedded bytes disagree, so a drop-in and its record change in the
   same commit.  No Go test executes htmx; VENDOR.md lists the client-side flows to walk by hand

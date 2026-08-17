@@ -1,0 +1,62 @@
+{{define "title"}}Sample Topics — Cadence Cards{{end}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="back-link-row">
+  <a class="back-link" href="/topics">{{template "icon-arrow-left"}}Topics</a>
+</div>
+<h1 class="page-title has-sub">Sample Topics</h1>
+<p class="page-sub">Ready-made topics you can add to your account. Each one arrives as an ordinary
+  topic — rename it, edit the cards, or delete it. Every card starts new, so it is due straight
+  away.</p>
+
+{{/* The result of an add is swapped in above the grid, using the same fragment
+     the import page renders — one place where "created topic X with N decks"
+     is worded. */}}
+<div id="sample-result"></div>
+
+<div class="grid-cards">
+  {{range $d.Samples}}
+  <div class="panel">
+    <div class="panel-body-5">
+      <div class="media-row">
+        <div class="chip chip-indigo">{{template "icon-folder"}}</div>
+        <div class="media-body">
+          <h3 class="entity-title">{{.Name}}</h3>
+          <p class="tile-meta">{{.DeckCount}} deck{{if ne .DeckCount 1}}s{{end}} ·
+            {{.CardCount}} card{{if ne .CardCount 1}}s{{end}}</p>
+        </div>
+      </div>
+      {{with .Description}}<p class="sample-blurb">{{.}}</p>{{end}}
+
+      {{/* The YAML loads on first expand rather than with the page: three
+           samples inlined would be most of the document, and it is the same
+           readonly-textarea shape as the export dialogs. */}}
+      <details class="disclosure sample-preview">
+        <summary class="disclosure-summary">
+          <span class="disclosure-chevron">{{template "icon-chevron-right"}}</span>
+          <span class="disclosure-title">Preview YAML</span>
+        </summary>
+        <div class="disclosure-body">
+          <textarea class="input mono share-yaml" readonly rows="12"
+                    hx-get="/samples/{{.Slug}}/preview"
+                    hx-trigger="toggle once from:closest details" hx-swap="textContent"></textarea>
+        </div>
+      </details>
+    </div>
+    {{/* A spinner rather than the .btn-busy label swap: that is driven by
+         app.js flagging the form on submit and cleared by the navigation that
+         follows, which an htmx post never does — the button would read
+         "Adding…" forever. hx-disabled-elt is what stops a double-add. */}}
+    <div class="panel-footer footer-end">
+      <form hx-post="/samples/{{.Slug}}" hx-target="#sample-result" hx-swap="innerHTML"
+            hx-disabled-elt="find button" hx-indicator="#spin-{{.Slug}}">
+        <span id="spin-{{.Slug}}" class="spinner htmx-indicator" aria-hidden="true"></span>
+        <button type="submit" class="btn btn-sm btn-primary">
+          {{template "icon-plus"}}Add to my topics
+        </button>
+      </form>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

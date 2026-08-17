@@ -12,3 +12,13 @@ var Templates embed.FS
 //
 //go:embed static
 var Static embed.FS
+
+// Samples holds the bundled sample topics offered at /samples, one topic-format
+// YAML file each. They live here rather than on disk so they ship in the single
+// binary and are present in the container; internal/samples parses them.
+//
+// Deliberately outside Static: these are never served as assets, so they must
+// not feed assetVersion's fingerprint or gain a cache-busting URL.
+//
+//go:embed samples
+var Samples embed.FS
