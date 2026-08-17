@@ -7,7 +7,8 @@ import (
 )
 
 // TopicParams are the writable topic fields (name + the 7 Claude prompt-config
-// columns from the source schema).
+// columns from the source schema, + the 3 provenance columns, which no prompt
+// ever sees).
 type TopicParams struct {
 	Name             string
 	TopicDescription *string
@@ -16,15 +17,19 @@ type TopicParams struct {
 	ContextType      *string
 	Example          *string
 	Question         *string
+	Author           *string
+	License          *string
+	Source           *string
 }
 
-const topicCols = `id, user_id, name, topic_description, expertise, focus, context_type, example, question, created_at, updated_at`
+const topicCols = `id, user_id, name, topic_description, expertise, focus, context_type, example, question, author, license, source, created_at, updated_at`
 
 func scanTopic(scan func(dest ...any) error) (Topic, error) {
 	var t Topic
-	var desc, exp, focus, ctxType, example, question sql.NullString
+	var desc, exp, focus, ctxType, example, question, author, license, source sql.NullString
 	var created, updated string
-	if err := scan(&t.ID, &t.UserID, &t.Name, &desc, &exp, &focus, &ctxType, &example, &question, &created, &updated); err != nil {
+	if err := scan(&t.ID, &t.UserID, &t.Name, &desc, &exp, &focus, &ctxType, &example, &question,
+		&author, &license, &source, &created, &updated); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Topic{}, ErrNotFound
 		}
@@ -32,6 +37,7 @@ func scanTopic(scan func(dest ...any) error) (Topic, error) {
 	}
 	t.TopicDescription, t.Expertise, t.Focus = nullStr(desc), nullStr(exp), nullStr(focus)
 	t.ContextType, t.Example, t.Question = nullStr(ctxType), nullStr(example), nullStr(question)
+	t.Author, t.License, t.Source = nullStr(author), nullStr(license), nullStr(source)
 	var err error
 	if t.CreatedAt, err = parseTime(created); err != nil {
 		return Topic{}, err
@@ -47,7 +53,8 @@ func scanTopic(scan func(dest ...any) error) (Topic, error) {
 func (s *Store) ListTopics(ctx context.Context, userID int64) ([]Topic, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT t.id, t.user_id, t.name, t.topic_description, t.expertise, t.focus,
-		       t.context_type, t.example, t.question, t.created_at, t.updated_at,
+		       t.context_type, t.example, t.question, t.author, t.license, t.source,
+		       t.created_at, t.updated_at,
 		       COUNT(DISTINCT d.id) AS deck_count,
 		       COUNT(DISTINCT c.id) AS card_count
 		FROM topics t
@@ -64,14 +71,15 @@ func (s *Store) ListTopics(ctx context.Context, userID int64) ([]Topic, error) {
 	var topics []Topic
 	for rows.Next() {
 		var t Topic
-		var desc, exp, focus, ctxType, example, question sql.NullString
+		var desc, exp, focus, ctxType, example, question, author, license, source sql.NullString
 		var created, updated string
 		if err := rows.Scan(&t.ID, &t.UserID, &t.Name, &desc, &exp, &focus, &ctxType, &example, &question,
-			&created, &updated, &t.DeckCount, &t.CardCount); err != nil {
+			&author, &license, &source, &created, &updated, &t.DeckCount, &t.CardCount); err != nil {
 			return nil, err
 		}
 		t.TopicDescription, t.Expertise, t.Focus = nullStr(desc), nullStr(exp), nullStr(focus)
 		t.ContextType, t.Example, t.Question = nullStr(ctxType), nullStr(example), nullStr(question)
+		t.Author, t.License, t.Source = nullStr(author), nullStr(license), nullStr(source)
 		if t.CreatedAt, err = parseTime(created); err != nil {
 			return nil, err
 		}
@@ -94,10 +102,12 @@ func (s *Store) GetTopic(ctx context.Context, userID, topicID int64) (Topic, err
 // within the user's topics.
 func (s *Store) CreateTopic(ctx context.Context, userID int64, p TopicParams) (Topic, error) {
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO topics (user_id, name, topic_description, expertise, focus, context_type, example, question)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO topics (user_id, name, topic_description, expertise, focus, context_type, example, question,
+		                    author, license, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		userID, p.Name, strOrNil(p.TopicDescription), strOrNil(p.Expertise), strOrNil(p.Focus),
-		strOrNil(p.ContextType), strOrNil(p.Example), strOrNil(p.Question))
+		strOrNil(p.ContextType), strOrNil(p.Example), strOrNil(p.Question),
+		strOrNil(p.Author), strOrNil(p.License), strOrNil(p.Source))
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Topic{}, ErrDuplicate
@@ -116,10 +126,12 @@ func (s *Store) UpdateTopic(ctx context.Context, userID, topicID int64, p TopicP
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE topics SET name = ?, topic_description = ?, expertise = ?, focus = ?,
 		       context_type = ?, example = ?, question = ?,
+		       author = ?, license = ?, source = ?,
 		       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 		WHERE id = ? AND user_id = ?`,
 		p.Name, strOrNil(p.TopicDescription), strOrNil(p.Expertise), strOrNil(p.Focus),
-		strOrNil(p.ContextType), strOrNil(p.Example), strOrNil(p.Question), topicID, userID)
+		strOrNil(p.ContextType), strOrNil(p.Example), strOrNil(p.Question),
+		strOrNil(p.Author), strOrNil(p.License), strOrNil(p.Source), topicID, userID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Topic{}, ErrDuplicate

@@ -26,8 +26,13 @@ type Topic struct {
 	ContextType      *string
 	Example          *string
 	Question         *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// Provenance: where this topic came from. Free text, unused by
+	// internal/claude, carried through YAML import/export.
+	Author    *string
+	License   *string
+	Source    *string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 	// Denormalized counts (topic list page).
 	DeckCount int
 	CardCount int

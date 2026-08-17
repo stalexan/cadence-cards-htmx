@@ -108,4 +108,41 @@
     </div>
   </div>
 </details>
+
+{{/* Attribution is a disclosure of its own rather than three more fields under
+     "Tutoring style": none of it is ever sent to Claude. It opens by itself
+     when the topic already carries provenance, which is how an imported deck
+     arrives — see ShowAttribution. */}}
+<details class="disclosure"{{if .ShowAttribution}} open{{end}}>
+  <summary class="disclosure-summary">
+    <span class="disclosure-chevron">{{template "icon-chevron-right"}}</span>
+    <span class="disclosure-title">Attribution</span>
+    <span class="disclosure-note">optional — who made this topic, and how it may be reused</span>
+  </summary>
+  <div class="disclosure-body">
+    <div class="field">
+      <label class="label" for="f-author">Author</label>
+      <input class="input" id="f-author" type="text" name="author"
+             value="{{deref $v.Author}}" placeholder="Not specified">
+      <p class="field-help">Who wrote these cards. Written into the topic’s YAML export, so it
+        travels with the file when you share it.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-license">License</label>
+      <input class="input" id="f-license" type="text" name="license"
+             value="{{deref $v.License}}" placeholder="Not specified">
+      <p class="field-help">How others may reuse them — an identifier like
+        <code>CC-BY-4.0</code>, or a sentence in your own words. Free text; nothing is enforced.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="f-source">Source</label>
+      <input class="input" id="f-source" type="text" name="source"
+             value="{{deref $v.Source}}" placeholder="https://example.com/decks/spanish">
+      <p class="field-help">Where the original lives. Shown as a link on the topic page when it is
+        an http(s) address, and as plain text otherwise — so a book citation works too.</p>
+    </div>
+  </div>
+</details>
 {{end}}

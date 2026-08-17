@@ -81,10 +81,21 @@ and HTMX swapping fragments.
   (key order, defaults, `# ...` metadata header, date-only `LastSeen` as UTC calendar date,
   `Reverse*` twins, Easiness ≥ 1.3 with **no upper cap**). Golden tests pin the format — if they
   fail, fix the code, not the golden file, unless the format change is deliberate on both apps.
-  `topic.go` adds a **topic** format (a mapping: `Topic:` config + optional `Decks:` with their
-  settings and cards) that is **Go-only** — the Svelte app has no counterpart, so it is free to
+  `topic.go` adds a **topic** format (a mapping: optional `Provenance:` + `Topic:` config +
+  optional `Decks:` with their settings and cards) that is **Go-only** — the Svelte app has no
+  counterpart, so it is free to
   evolve. Its per-deck card blocks are built by the shared `cardNodes`/`decodeCard`, so they stay
-  identical to the deck format; `TestTopicCardBlockMatchesDeckFormat` is the guard. A deck file is a
+  identical to the deck format; `TestTopicCardBlockMatchesDeckFormat` is the guard. `Provenance`
+  (`Author`/`License`/`Source`, all optional free text) is a **sibling** of `Topic:`, not three more
+  keys inside it: everything under `Topic:` is prompt configuration that `internal/claude` feeds to
+  the tutor, and keeping the blocks apart is what stops a licence string from ever reaching a
+  prompt. It is emitted **first**, ahead of `Topic:`, because a real topic's `Example`/`Question`
+  run to thousands of characters on one escaped line and bury anything below them
+  (`TestExportTopicProvenanceGolden` pins the position). Key order means nothing to the parser —
+  `Detect` and `ImportTopic` both find their blocks by name. It persists to
+  `topics.author/license/source`, so attribution survives an import instead
+  of being laundered by the next export; a malformed `Provenance:` costs the attribution, never the
+  cards. The block is omitted from an export entirely when nothing is set. A deck file is a
   sequence and a topic file is a mapping, which is what `Detect` keys on to route `POST /import`.
   The import page's live "what did I paste?" hint goes through `POST /import/detect`, which runs the
   *same* `Detect` and parsers — never re-sniff the format in `app.js`, or the hint will drift from
@@ -153,7 +164,8 @@ schedule per study direction (`is_reversed`, `UNIQUE(card_id, is_reversed)`); SM
 the schedule. Chat transcripts live in `conversations` (owned by a topic, optionally tied to a
 schedule; both cascade) with their `chat_messages`, pruned after `store.ConversationTTL` by the
 hourly ticker. Topics carry six prompt-config columns consumed by `internal/claude` (plus `name`,
-the seventh `TopicConfig` field). Tags are
+the seventh `TopicConfig` field), and three provenance columns (`author`, `license`, `source`) that
+no prompt ever sees. Tags are
 a JSON array in `cards.tags` (queried with `json_each`). Timestamps are RFC3339 UTC `TEXT` with
 millisecond precision (`store.timeFormat`).
 

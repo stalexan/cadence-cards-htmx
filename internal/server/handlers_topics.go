@@ -19,6 +19,9 @@ func topicParamsFromForm(r *http.Request) store.TopicParams {
 		ContextType:      formStrPtr(r, "contextType"),
 		Example:          formStrPtr(r, "example"),
 		Question:         formStrPtr(r, "question"),
+		Author:           formStrPtr(r, "author"),
+		License:          formStrPtr(r, "license"),
+		Source:           formStrPtr(r, "source"),
 	}
 }
 
@@ -32,6 +35,9 @@ func topicParamsFromTopic(t store.Topic) store.TopicParams {
 		ContextType:      t.ContextType,
 		Example:          t.Example,
 		Question:         t.Question,
+		Author:           t.Author,
+		License:          t.License,
+		Source:           t.Source,
 	}
 }
 
@@ -67,6 +73,20 @@ func (d topicFieldsData) ShowAdvanced() bool {
 		d.Values.Expertise, d.Values.Focus, d.Values.ContextType,
 		d.Values.Example, d.Values.Question,
 	} {
+		if p != nil && *p != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// ShowAttribution opens the attribution disclosure when the topic carries any
+// provenance — which, for an imported deck, is the case before the user has
+// touched the form. It is a separate disclosure from ShowAdvanced because
+// nothing in it reaches a prompt: a suggestion filling in tutoring settings
+// should not pop open a block about who holds the copyright.
+func (d topicFieldsData) ShowAttribution() bool {
+	for _, p := range []*string{d.Values.Author, d.Values.License, d.Values.Source} {
 		if p != nil && *p != "" {
 			return true
 		}
@@ -308,6 +328,14 @@ func (s *Server) topicExportYAML(r *http.Request) (string, string, error) {
 		Example:          topic.Example,
 		Question:         topic.Question,
 	}
+	// Always exported, independent of the two scope toggles: attribution
+	// describes the file itself, so a config-only export is as much in need of
+	// it as a full one. ExportTopic omits the block when all three are unset.
+	prov := &yamlio.Provenance{
+		Author:  topic.Author,
+		License: topic.License,
+		Source:  topic.Source,
+	}
 
 	var exportDecks []yamlio.ExportDeck
 	cardCount := 0
@@ -352,7 +380,7 @@ func (s *Server) topicExportYAML(r *http.Request) (string, string, error) {
 		DeckCount:     len(exportDecks),
 		CardCount:     cardCount,
 	}
-	content, err := yamlio.ExportTopic(cfg, exportDecks, meta, includeDecks, includeSM2)
+	content, err := yamlio.ExportTopic(cfg, prov, exportDecks, meta, includeDecks, includeSM2)
 	if err != nil {
 		return "", "", err
 	}

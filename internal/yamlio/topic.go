@@ -8,11 +8,11 @@ import (
 )
 
 // The topic format bundles a topic's Claude prompt configuration with,
-// optionally, all of its decks and their cards. Unlike the card format it has
-// no counterpart in the sibling Svelte app — it is Go-only, and nothing here
-// may change how a bare card list is emitted or parsed. The per-deck Cards
-// block is built by cardNodes and decoded by decodeCard, the same code the
-// deck format uses, so the two stay byte-identical.
+// optionally, its provenance and all of its decks and their cards. Unlike the
+// card format it has no counterpart in the sibling Svelte app — it is Go-only,
+// and nothing here may change how a bare card list is emitted or parsed. The
+// per-deck Cards block is built by cardNodes and decoded by decodeCard, the
+// same code the deck format uses, so the two stay byte-identical.
 //
 // A topic file is a mapping (Topic: / Decks:); a deck file is a sequence. That
 // difference is what Detect keys on.
@@ -27,6 +27,40 @@ type TopicConfig struct {
 	ContextType      *string `yaml:"ContextType"`
 	Example          *string `yaml:"Example"`
 	Question         *string `yaml:"Question"`
+}
+
+// Provenance records where a topic file came from: who wrote it, under what
+// terms it may be reused, and where the original lives.
+//
+// It is a sibling of Topic rather than three more keys inside it, because
+// everything under Topic: is prompt configuration that internal/claude feeds to
+// the tutor. Attribution is about the file, not about how the subject is
+// taught, and keeping the two blocks apart is what stops a licence string from
+// ever reaching a prompt.
+//
+// All three fields are free text and all three are optional — a licence is not
+// validated against SPDX or anything else, because a shared deck's terms are as
+// often a sentence as an identifier.
+type Provenance struct {
+	Author  *string `yaml:"Author"`
+	License *string `yaml:"License"`
+	Source  *string `yaml:"Source"`
+}
+
+// IsZero reports whether no provenance is set. An export omits the block
+// entirely in that case rather than emitting three nulls, so the format stays
+// quiet for the topics — most of them — that were never shared.
+//
+// A pointer to a blank string counts as unset, matching what trimmedPtr does on
+// the way in: the store writes NULL for an empty field, but a caller building a
+// Provenance by hand should not be able to produce a block of empty quotes.
+func (p Provenance) IsZero() bool {
+	for _, f := range []*string{p.Author, p.License, p.Source} {
+		if f != nil && strings.TrimSpace(*f) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // ExportDeck is one deck in a topic export: the deck's own settings plus its
@@ -50,11 +84,22 @@ type TopicMetadata struct {
 	CardCount     int
 }
 
-// Ordered shapes for export. Decks is omitempty so a config-only export omits
-// the key entirely rather than emitting an empty list.
+// Ordered shapes for export. Decks and Provenance are omitempty so a
+// config-only export omits the key entirely rather than emitting an empty list,
+// and an unattributed topic emits no Provenance block at all.
+//
+// Provenance leads the file deliberately. It was below Topic first, which reads
+// well on a small example and fails on a real one: a topic's Example and
+// Question run to thousands of characters on a single escaped line, so anything
+// after them is past a wall of text in the export dialog's textarea. Who wrote a
+// shared deck and how it may be reused is the first thing a reader looks for, so
+// it goes where they look. Key order carries no meaning to the parser — Detect
+// scans the mapping for a Topic key wherever it sits, and ImportTopic reads the
+// three blocks by name.
 type exportTopicFile struct {
-	Topic TopicConfig  `yaml:"Topic"`
-	Decks []exportDeck `yaml:"Decks,omitempty"`
+	Provenance *Provenance  `yaml:"Provenance,omitempty"`
+	Topic      TopicConfig  `yaml:"Topic"`
+	Decks      []exportDeck `yaml:"Decks,omitempty"`
 }
 
 type exportDeck struct {
@@ -67,9 +112,20 @@ type exportDeck struct {
 
 // ExportTopic serializes a topic and, when includeDecks is set, its decks and
 // cards. SM-2 parameters follow includeSM2 exactly as in Export; the comment
-// header is emitted only when meta is non-nil.
-func ExportTopic(cfg TopicConfig, decks []ExportDeck, meta *TopicMetadata, includeDecks, includeSM2 bool) (string, error) {
+// header is emitted only when meta is non-nil, and the Provenance block only
+// when prov carries something.
+func ExportTopic(cfg TopicConfig, prov *Provenance, decks []ExportDeck, meta *TopicMetadata, includeDecks, includeSM2 bool) (string, error) {
 	file := exportTopicFile{Topic: cfg}
+	if prov != nil && !prov.IsZero() {
+		// Normalized through the same trimmedPtr the importer uses, so a
+		// partly-filled struct emits `License: null` rather than `License: ""`
+		// and the two sides of the round trip agree on what blank means.
+		file.Provenance = &Provenance{
+			Author:  trimmedPtr(prov.Author),
+			License: trimmedPtr(prov.License),
+			Source:  trimmedPtr(prov.Source),
+		}
+	}
 	if includeDecks {
 		file.Decks = make([]exportDeck, len(decks))
 		for i, d := range decks {
@@ -134,8 +190,12 @@ type ImportedDeck struct {
 // (a deck with no name); per-card problems live on the deck.
 type ImportedTopic struct {
 	Config TopicConfig
-	Decks  []ImportedDeck
-	Errors []string
+	// Provenance is zero when the file carried no Provenance block. Its
+	// fields are nil rather than empty for a key that was present but blank,
+	// so "written and left empty" and "not written" import identically.
+	Provenance Provenance
+	Decks      []ImportedDeck
+	Errors     []string
 }
 
 // Format identifies which of the two YAML shapes a document is.
@@ -183,12 +243,14 @@ func ImportTopic(src string) (ImportedTopic, error) {
 		return ImportedTopic{}, fmt.Errorf("Error parsing YAML: a topic export must be a mapping with a Topic key")
 	}
 
-	var topicNode, decksNode *yaml.Node
+	var topicNode, provNode, decksNode *yaml.Node
 	doc := root.Content[0]
 	for i := 0; i+1 < len(doc.Content); i += 2 {
 		switch doc.Content[i].Value {
 		case "Topic":
 			topicNode = doc.Content[i+1]
+		case "Provenance":
+			provNode = doc.Content[i+1]
 		case "Decks":
 			decksNode = doc.Content[i+1]
 		}
@@ -204,6 +266,23 @@ func ImportTopic(src string) (ImportedTopic, error) {
 	out.Config.Name = strings.TrimSpace(out.Config.Name)
 	if out.Config.Name == "" {
 		return ImportedTopic{}, fmt.Errorf("Topic Name is required")
+	}
+
+	// Provenance is optional, and a malformed block costs the attribution
+	// rather than the file: someone hand-editing a shared deck should not lose
+	// a thousand cards over a mistyped licence line. A null scalar (`Provenance:`
+	// with nothing under it) is the same as an absent key.
+	if provNode != nil && provNode.Kind == yaml.MappingNode {
+		var prov Provenance
+		if err := provNode.Decode(&prov); err == nil {
+			out.Provenance = Provenance{
+				Author:  trimmedPtr(prov.Author),
+				License: trimmedPtr(prov.License),
+				Source:  trimmedPtr(prov.Source),
+			}
+		} else {
+			out.Errors = append(out.Errors, fmt.Sprintf("Provenance: %v — attribution was skipped", err))
+		}
 	}
 
 	// Decks is optional: a config-only export omits it entirely.
@@ -223,6 +302,20 @@ func ImportTopic(src string) (ImportedTopic, error) {
 		out.Decks = append(out.Decks, deck)
 	}
 	return out, nil
+}
+
+// trimmedPtr normalizes an optional free-text field: surrounding whitespace is
+// dropped, and a value that was only whitespace becomes nil. That keeps
+// `Author: ""` and an omitted Author from producing different stored rows.
+func trimmedPtr(p *string) *string {
+	if p == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*p)
+	if v == "" {
+		return nil
+	}
+	return &v
 }
 
 // decodeDeck decodes one deck node and its cards. Card errors are collected on

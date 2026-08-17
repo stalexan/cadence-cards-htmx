@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -66,6 +67,22 @@ var funcMap = template.FuncMap{
 			return ""
 		}
 		return *p
+	},
+	// httpURL returns s when it is an absolute http(s) URL and "" otherwise, so
+	// a template can decide between a link and plain text. A topic's Source is
+	// free text carried in from an imported file and may well be a book
+	// citation rather than an address. html/template would already neutralize a
+	// javascript: href into #ZgotmplZ, but that renders as a broken link where
+	// showing the text someone actually wrote is the honest outcome.
+	"httpURL": func(s string) string {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return ""
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return ""
+		}
+		return s
 	},
 	"joinTags":  func(tags []string) string { return strings.Join(tags, ", ") },
 	"hasPrefix": strings.HasPrefix,

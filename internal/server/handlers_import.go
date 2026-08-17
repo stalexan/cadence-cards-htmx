@@ -92,7 +92,7 @@ func (s *Server) handleImportDetect(w http.ResponseWriter, r *http.Request) {
 		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
 			Format:  "topic",
 			Summary: "Topic export detected: " + parsed.Config.Name,
-			Detail:  topicDetail(len(parsed.Decks), cards),
+			Detail:  topicDetail(len(parsed.Decks), cards) + provenanceDetail(parsed.Provenance),
 		})
 	case yamlio.FormatCards:
 		valid, invalid, err := yamlio.Import(content)
@@ -117,7 +117,10 @@ func (s *Server) handleImportDetect(w http.ResponseWriter, r *http.Request) {
 		s.fragment(w, http.StatusOK, "import_detect", importDetectData{
 			Format: "unknown", Problem: true,
 			Summary: "This does not look like a card list or a topic export.",
-			Detail:  "A card list starts with “- Front:”; a topic export starts with “Topic:”.",
+			// Not "starts with Topic:" — a topic file may lead with its
+			// Provenance block, and Detect looks for the key rather than the
+			// first line.
+			Detail: "A card list starts with “- Front:”; a topic export has a “Topic:” block.",
 		})
 	}
 }
@@ -129,6 +132,25 @@ func topicDetail(decks, cards int) string {
 		return "Settings only — no decks or cards in this file."
 	}
 	return plural(decks, "deck", "decks") + ", " + plural(cards, "card", "cards") + "."
+}
+
+// provenanceDetail appends a file's attribution to the import hint. Terms of
+// reuse are worth seeing *before* the import rather than on the topic page
+// afterwards, which is the whole reason the hint is rendered server-side from
+// the same parse the import will run. Source is left out — a URL is too long
+// for one line of hint, and it is visible in the YAML box above it.
+func provenanceDetail(p yamlio.Provenance) string {
+	var parts []string
+	if p.Author != nil {
+		parts = append(parts, "by "+*p.Author)
+	}
+	if p.License != nil {
+		parts = append(parts, "licensed "+*p.License)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " Shared " + strings.Join(parts, ", ") + "."
 }
 
 func plural(n int, one, many string) string {
@@ -293,6 +315,12 @@ func (s *Server) importTopic(w http.ResponseWriter, r *http.Request, userID int6
 			ContextType:      parsed.Config.ContextType,
 			Example:          parsed.Config.Example,
 			Question:         parsed.Config.Question,
+			// Carried through verbatim: dropping attribution here would make a
+			// shared deck lose its author and licence the moment it entered the
+			// app, and re-exporting it would silently launder the file.
+			Author:  parsed.Provenance.Author,
+			License: parsed.Provenance.License,
+			Source:  parsed.Provenance.Source,
 		},
 	}
 

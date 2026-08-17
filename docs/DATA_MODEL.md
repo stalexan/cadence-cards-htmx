@@ -91,7 +91,8 @@ authenticate anything.
 ### `topics`
 
 A folder of decks **and** the Claude prompt configuration. The dual role is the reason topics carry
-seven text fields that have nothing to do with foldering.
+seven text fields that have nothing to do with foldering, plus three more recording where the topic
+came from.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -99,6 +100,7 @@ seven text fields that have nothing to do with foldering.
 | `user_id` | INTEGER FK → `users(id)` CASCADE | **The ownership root.** Every authorization check in the app terminates here. |
 | `name` | TEXT NOT NULL | Also the first field of `claude.TopicConfig`. |
 | `topic_description`, `expertise`, `focus`, `context_type`, `example`, `question` | TEXT | The other six prompt-config fields, consumed by `internal/claude/prompts.go`. All nullable; blanks fall back to `claude.PromptDefaults`, which the topic form also shows as input placeholders. |
+| `author`, `license`, `source` | TEXT | Provenance: who wrote the topic, how it may be reused, where the original lives. All nullable and all free text — no SPDX validation, because a shared deck's terms are as often a sentence as an identifier. Read and written by the YAML `Provenance:` block (`internal/yamlio/topic.go`) so attribution survives an import instead of being dropped at the door. **Nothing here reaches `internal/claude`** — that separation is the reason they are not part of the prompt-config group above. `source` is rendered as a link only when the `httpURL` template helper recognizes it as an http(s) address. |
 | `created_at`, `updated_at` | TEXT | |
 
 Constraints: `UNIQUE (name, user_id)` — topic names are unique per user, not globally. Index:

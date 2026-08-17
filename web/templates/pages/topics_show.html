@@ -61,6 +61,41 @@
       </div>
       {{end}}
     </div>
+
+    {{/* Attribution renders only when the topic carries some — an unattributed
+         topic, which is most of them, should not grow a block of "Not
+         specified". A Source is free text from an imported file, so it becomes
+         a link only when httpURL says it is a real http(s) address. */}}
+    {{if or $t.Author $t.License $t.Source}}
+    <div class="panel-section">
+      <h2 class="config-heading">Attribution</h2>
+      <dl class="config-grid">
+        {{with $t.Author}}
+        <div>
+          <dt>Author</dt>
+          <dd>{{.}}</dd>
+        </div>
+        {{end}}
+        {{with $t.License}}
+        <div>
+          <dt>License</dt>
+          <dd>{{.}}</dd>
+        </div>
+        {{end}}
+        {{with $t.Source}}
+        <div>
+          <dt>Source</dt>
+          <dd>
+            {{$url := httpURL (deref $t.Source)}}
+            {{if $url}}<a class="entity-link" href="{{$url}}"
+                          rel="nofollow noopener noreferrer" target="_blank">{{$url}}</a>
+            {{else}}{{.}}{{end}}
+          </dd>
+        </div>
+        {{end}}
+      </dl>
+    </div>
+    {{end}}
   </div>
 
   <div class="panel">
@@ -115,7 +150,7 @@
   <div class="dialog-body">
     <h3 class="dialog-title">Export “{{$t.Name}}”</h3>
     <div class="dialog-content">
-      <p class="dialog-message">Download the topic as YAML, or copy it below. It carries the topic’s Claude configuration and, if you choose, all of its decks and cards.</p>
+      <p class="dialog-message">Download the topic as YAML, or copy it below. It carries the topic’s Claude configuration and attribution and, if you choose, all of its decks and cards.</p>
       <label class="check-field share-toggle">
         {{/* textContent, never innerHTML: the response is raw YAML, and HTML
              parsing would mangle card content like "Vector<int>". */}}

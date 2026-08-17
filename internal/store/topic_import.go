@@ -58,11 +58,13 @@ func (s *Store) ImportTopic(ctx context.Context, userID int64, p TopicImportPara
 		result.TopicName, result.Renamed = name, renamed
 
 		res, err := tx.ExecContext(ctx, `
-			INSERT INTO topics (user_id, name, topic_description, expertise, focus, context_type, example, question)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			INSERT INTO topics (user_id, name, topic_description, expertise, focus, context_type, example, question,
+			                    author, license, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			userID, name, strOrNil(p.Topic.TopicDescription), strOrNil(p.Topic.Expertise),
 			strOrNil(p.Topic.Focus), strOrNil(p.Topic.ContextType), strOrNil(p.Topic.Example),
-			strOrNil(p.Topic.Question))
+			strOrNil(p.Topic.Question), strOrNil(p.Topic.Author), strOrNil(p.Topic.License),
+			strOrNil(p.Topic.Source))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return ErrDuplicate

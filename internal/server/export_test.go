@@ -596,6 +596,120 @@ func TestImportDetectRequiresAuth(t *testing.T) {
 	}
 }
 
+// Provenance has to survive the whole loop — form, page, export, hint, import —
+// because each hop is a place attribution has historically been dropped. A
+// shared deck whose licence evaporates somewhere in the middle is worse than
+// one that never carried a licence, since the re-export still looks definitive.
+func TestTopicProvenanceEndToEnd(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+	ctx := context.Background()
+	u, _, err := app.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deck, err := app.store.GetDeck(ctx, u.ID, card.DeckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topicID := deck.TopicID
+
+	w := app.do("POST", "/topics/"+itoa(topicID), url.Values{
+		"name":    {"Spanish"},
+		"author":  {"Jane Doe"},
+		"license": {"CC-BY-4.0"},
+		"source":  {"https://example.com/decks/spanish"},
+	})
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("topic update = %d, body: %s", w.Code, w.Body.String())
+	}
+
+	page := app.do("GET", "/topics/"+itoa(topicID), nil).Body.String()
+	for _, want := range []string{
+		"Attribution", "Jane Doe", "CC-BY-4.0",
+		`href="https://example.com/decks/spanish"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("topic page missing %q", want)
+		}
+	}
+
+	// Deliberately with neither scope toggle: attribution describes the file,
+	// so it ships even when the decks do not.
+	exported := app.do("GET", "/topics/"+itoa(topicID)+"/export", nil).Body.String()
+	for _, want := range []string{"Provenance:", "Author: Jane Doe", "License: CC-BY-4.0"} {
+		if !strings.Contains(exported, want) {
+			t.Errorf("export missing %q:\n%s", want, exported)
+		}
+	}
+
+	// The paste hint names the terms before anything is imported.
+	hint := app.do("POST", "/import/detect", url.Values{"yamlContent": {exported}}).Body.String()
+	if !strings.Contains(hint, "Jane Doe") || !strings.Contains(hint, "CC-BY-4.0") {
+		t.Errorf("detect hint omitted the attribution: %s", hint)
+	}
+
+	if w := app.do("POST", "/import", url.Values{"yamlContent": {exported}}); w.Code != http.StatusOK {
+		t.Fatalf("import = %d, body: %s", w.Code, w.Body.String())
+	}
+	topics, err := app.store.ListTopics(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var imported *store.Topic
+	for i, tp := range topics {
+		if tp.Name == "Spanish (2)" {
+			imported = &topics[i]
+		}
+	}
+	if imported == nil {
+		t.Fatalf("imported topic not found in %+v", topics)
+	}
+	if imported.Author == nil || *imported.Author != "Jane Doe" ||
+		imported.License == nil || *imported.License != "CC-BY-4.0" {
+		t.Errorf("import dropped the attribution: %+v", imported)
+	}
+}
+
+// A Source is free text carried in from someone else's file. Only an http(s)
+// address becomes a link; anything else renders as the text it is, which is
+// both what a book citation needs and what keeps a javascript: URL out of an
+// href.
+func TestTopicSourceLinksOnlyHTTPURLs(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+	card := app.seed(false)
+	ctx := context.Background()
+	u, _, err := app.store.GetUserByEmail(ctx, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deck, err := app.store.GetDeck(ctx, u.ID, card.DeckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct{ name, source, wantText string }{
+		{"citation", "Chapter 4 of Foo (2019)", "Chapter 4 of Foo (2019)"},
+		{"javascript", "javascript:alert(1)", "javascript:alert(1)"},
+		{"scheme-less", "example.com/decks", "example.com/decks"},
+	} {
+		if w := app.do("POST", "/topics/"+itoa(deck.TopicID), url.Values{
+			"name": {"Spanish"}, "source": {c.source},
+		}); w.Code != http.StatusSeeOther {
+			t.Fatalf("%s: update = %d", c.name, w.Code)
+		}
+		page := app.do("GET", "/topics/"+itoa(deck.TopicID), nil).Body.String()
+		if !strings.Contains(page, c.wantText) {
+			t.Errorf("%s: source text missing from the page", c.name)
+		}
+		if strings.Contains(page, `href="`+c.source) {
+			t.Errorf("%s: non-URL source was rendered as a link", c.name)
+		}
+	}
+}
+
 // Choosing and dropping a file are both client-side (app.js reads the file
 // into the textarea), so the only thing the server can guarantee is that the
 // wiring attributes ship. Without them the button renders and silently does

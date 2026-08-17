@@ -15,6 +15,9 @@ func sampleTopicImport() TopicImportParams {
 			Name:             "Spanish",
 			TopicDescription: strPtr("Travel Spanish"),
 			Expertise:        strPtr("patient tutor"),
+			Author:           strPtr("Jane Doe"),
+			License:          strPtr("CC-BY-4.0"),
+			Source:           strPtr("https://example.com/decks/spanish"),
 		},
 		Decks: []DeckImportParams{
 			{
@@ -36,6 +39,13 @@ func sampleTopicImport() TopicImportParams {
 }
 
 func strPtr(s string) *string { return &s }
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
 
 func TestImportTopic(t *testing.T) {
 	s := newTestStore(t)
@@ -61,6 +71,14 @@ func TestImportTopic(t *testing.T) {
 	}
 	if topic.TopicDescription == nil || *topic.TopicDescription != "Travel Spanish" {
 		t.Errorf("prompt config was not carried: %+v", topic)
+	}
+	// Attribution rides in on the same insert as the prompt config: a shared
+	// deck that loses its author and licence at the door is worse than one that
+	// never carried them, because the re-export looks authoritative.
+	if deref(topic.Author) != "Jane Doe" || deref(topic.License) != "CC-BY-4.0" ||
+		deref(topic.Source) != "https://example.com/decks/spanish" {
+		t.Errorf("provenance was not carried: author=%q license=%q source=%q",
+			deref(topic.Author), deref(topic.License), deref(topic.Source))
 	}
 
 	decks, err := s.ListDecks(ctx, u.ID, &res.TopicID)
@@ -112,6 +130,56 @@ func TestImportTopic(t *testing.T) {
 		if c.Front == "comer" && c.ReverseSchedule() == nil {
 			t.Error("bidirectional deck should give every card a reverse schedule")
 		}
+	}
+}
+
+// Provenance is writable through the ordinary topic CRUD, not only through
+// import: someone who wrote a deck themselves needs to be able to claim it, and
+// someone re-licensing an imported one needs to be able to clear a field back
+// to NULL rather than being stuck with the original author's name.
+func TestTopicProvenanceCRUD(t *testing.T) {
+	s := newTestStore(t)
+	u, err := s.CreateUser(ctx, "Test", "test@example.com", "hash")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	created, err := s.CreateTopic(ctx, u.ID, TopicParams{
+		Name:    "Owned",
+		Author:  strPtr("Jane Doe"),
+		License: strPtr("CC-BY-4.0"),
+	})
+	if err != nil {
+		t.Fatalf("CreateTopic: %v", err)
+	}
+	if deref(created.Author) != "Jane Doe" || deref(created.License) != "CC-BY-4.0" {
+		t.Errorf("create dropped provenance: %+v", created)
+	}
+	if created.Source != nil {
+		t.Errorf("unset Source should read back nil, got %q", *created.Source)
+	}
+
+	updated, err := s.UpdateTopic(ctx, u.ID, created.ID, TopicParams{
+		Name:   "Owned",
+		Source: strPtr("https://example.com/x"),
+	})
+	if err != nil {
+		t.Fatalf("UpdateTopic: %v", err)
+	}
+	if updated.Author != nil || updated.License != nil {
+		t.Errorf("update should have cleared the omitted fields: %+v", updated)
+	}
+	if deref(updated.Source) != "https://example.com/x" {
+		t.Errorf("Source = %q", deref(updated.Source))
+	}
+
+	// ListTopics scans its own column list, so it can drift from GetTopic.
+	topics, err := s.ListTopics(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("ListTopics: %v", err)
+	}
+	if len(topics) != 1 || deref(topics[0].Source) != "https://example.com/x" {
+		t.Errorf("ListTopics lost provenance: %+v", topics)
 	}
 }
 

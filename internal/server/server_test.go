@@ -648,6 +648,9 @@ func TestTopicSuggestFillsOnlyBlankFields(t *testing.T) {
 		// Already typed by the user; must survive.
 		"name":  {"Español"},
 		"focus": {"just the subjunctive"},
+		// Provenance is outside the suggestion entirely, but it lives in the
+		// swapped block, so it has to come back out of it intact.
+		"author": {"Jane Doe"},
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("suggest = %d, want 200", w.Code)
@@ -657,7 +660,7 @@ func TestTopicSuggestFillsOnlyBlankFields(t *testing.T) {
 	// Matched as rendered input values, not bare substrings: the field help
 	// quotes phrases like "language tutor" as examples, so a plain Contains
 	// would pass whether or not the input was actually filled.
-	for _, keep := range []string{"Español", "just the subjunctive"} {
+	for _, keep := range []string{"Español", "just the subjunctive", "Jane Doe"} {
 		if !strings.Contains(body, `value="`+keep+`"`) {
 			t.Errorf("suggest overwrote a typed value: %q not in an input", keep)
 		}
@@ -1006,6 +1009,34 @@ func TestTopicFormDisclosureOpensWhenItHasContent(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), expertise) {
 		t.Error("stored expertise not rendered into the edit form")
+	}
+}
+
+// The two disclosures open independently. Attribution opening is what makes an
+// imported deck's licence visible without hunting for it; dragging the tutoring
+// settings open alongside it would suggest, wrongly, that the two are related.
+func TestTopicFormAttributionDisclosureIsIndependent(t *testing.T) {
+	app := newTestApp(t, nil)
+	app.login("t@example.com")
+
+	ctx := context.Background()
+	u, _, _ := app.store.GetUserByEmail(ctx, "t@example.com")
+	author := "Jane Doe"
+	topic, err := app.store.CreateTopic(ctx, u.ID, store.TopicParams{Name: "Spanish", Author: &author})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := app.do("GET", "/topics/"+itoa(topic.ID)+"/edit", nil).Body.String()
+	if n := strings.Count(body, `class="disclosure" open`); n != 1 {
+		t.Errorf("open disclosures = %d, want exactly 1 (attribution only)", n)
+	}
+	open := body[strings.Index(body, `class="disclosure" open`):]
+	if summary := open[:strings.Index(open, "</summary>")]; !strings.Contains(summary, "Attribution") {
+		t.Errorf("the open disclosure was not Attribution: %s", summary)
+	}
+	if !strings.Contains(body, `value="Jane Doe"`) {
+		t.Error("stored author not rendered into the edit form")
 	}
 }
 
