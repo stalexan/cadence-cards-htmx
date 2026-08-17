@@ -64,6 +64,7 @@ and HTMX swapping fragments.
   maintenance ticker (session/conversation cleanup, rate-limiter pruning, and the nightly question
   pre-generation batch via `internal/pregen`); `-version`, `-create-user`, `-reset-password`, `-list-users`, and `-backup` CLI. `-version` is handled before
   the logger, `config.Load`, and `store.Open`, so it works with a broken env and never migrates.
+  `docs/USER_MANAGEMENT.md` documents the account commands and the auth path they feed.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
   `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports
   only keys **not already in the environment**, so the real environment always wins and a stray

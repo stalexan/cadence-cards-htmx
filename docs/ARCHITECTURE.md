@@ -333,6 +333,8 @@ the Go side, not just the frontend.
   locking, CSP, client-IP trust) in reference form.
 - [`DATA_MODEL.md`](DATA_MODEL.md) — every table, key and cascade in column-level detail, plus how
   SQLite itself is used (pragmas, migrations, backups) and what each query pattern costs.
+- [`USER_MANAGEMENT.md`](USER_MANAGEMENT.md) — accounts, the `-create-user`/`-reset-password`/
+  `-list-users` CLI, and authentication end to end (login order, session tokens, lockouts).
 - [`VERSIONING.md`](VERSIONING.md) — how the release number is embedded and bumped.
 - [`FUTURE_WORK.md`](FUTURE_WORK.md) — considered-and-deferred work (job queue, SSE streaming,
   SQL due-ness, reader pool) with the triggers that would make each worth building, and what was

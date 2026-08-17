@@ -13,7 +13,8 @@ up, no NPM, no build step.
 New to this codebase? [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) walks through how the app is
 put together, request flow, and one feature traced end to end;
 [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) is the table-by-table schema reference and how SQLite is
-used.
+used; [`docs/USER_MANAGEMENT.md`](docs/USER_MANAGEMENT.md) covers accounts, the user-management CLI
+and how authentication works.
 
 ## Features
 
@@ -270,6 +271,10 @@ To see which accounts exist (id, email, name, creation date — never password h
 ```bash
 go run ./cmd/cadence -list-users
 ```
+
+[`docs/USER_MANAGEMENT.md`](docs/USER_MANAGEMENT.md) has the full detail on these commands
+(scripting them with piped input, what they validate, what they invalidate) and on how
+authentication itself works.
 
 ## Configuration
 
