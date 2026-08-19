@@ -318,7 +318,7 @@ Small on purpose. The load-bearing ones:
 - **`modernc.org/sqlite`** — pure-Go SQLite driver (no cgo)
 - **`github.com/anthropics/anthropic-sdk-go`** — the Claude API client
 - **`github.com/yuin/goldmark`** — Markdown rendering for chat replies
-- **`go.yaml.in/yaml/v4`** — deck import/export
+- **`gopkg.in/yaml.v3`** — deck import/export
 - **`golang.org/x/crypto`** — password hashing
 
 Everything else in `go.mod` is a transitive dependency of one of those — mostly of the Anthropic
