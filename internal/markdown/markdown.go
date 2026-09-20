@@ -14,22 +14,28 @@ import (
 	"html/template"
 	"strings"
 
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/text"
-	"github.com/yuin/goldmark/util"
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 )
 
-var md = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+// goldmark v2 has no single Markdown value: the parser and the renderer are
+// built separately, and each extension comes in two halves that have to be
+// wired to the matching side.  Both parse with the same parser, so Render and
+// PlainText still cannot disagree about what the source means.  Neither value
+// carries per-document state, so both are shared by every request.
+var (
+	mdParser   = parser.New(parser.WithExtensions(extension.GFMParser))
+	mdRenderer = html.New(html.WithExtensions(extension.GFMHTMLRenderer))
 )
 
 // Render converts markdown to sanitized HTML. On a rendering error the text
 // is returned escaped rather than dropped.
 func Render(src string) template.HTML {
+	source := []byte(src)
 	var buf bytes.Buffer
-	if err := md.Convert([]byte(src), &buf); err != nil {
+	if err := mdRenderer.Render(&buf, source, mdParser.Parse(source)); err != nil {
 		return template.HTML(template.HTMLEscapeString(src))
 	}
 	return template.HTML(buf.String())
@@ -39,52 +45,49 @@ func Render(src string) template.HTML {
 // dropped and every block boundary collapses to a single space. It backs the
 // one-line contexts — card table cells, the dashboard's recent activity —
 // where rendered HTML would break the layout but a literal "**bold**" is just
-// noise. It parses with the same md as Render, so the two cannot disagree
-// about what the source means.
+// noise.
 func PlainText(src string) string {
 	source := []byte(src)
-	doc := md.Parser().Parse(text.NewReader(source))
+	doc := mdParser.Parse(source)
 	var b strings.Builder
 	// Walk never returns an error here: the callback below cannot fail.
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			// The end of a block is a word boundary — without this "a\n\nb"
-			// would come out as "ab".
-			if n.Type() == ast.TypeBlock {
+			// would come out as "ab".  v2 dropped Node.Type(), so block-ness
+			// is a type assertion on the marker interface instead.
+			if _, ok := n.(ast.BlockNode); ok {
 				b.WriteByte(' ')
 			}
 			return ast.WalkContinue, nil
 		}
 		switch t := n.(type) {
 		case *ast.Text:
-			v := t.Value(source)
-			if !t.IsRaw() {
-				// The same unescaping goldmark's HTML writer does before
-				// escaping. Without it a source "\*" or "&amp;" would survive
-				// here as "\*" and "&amp;" while the rendered card shows "*"
-				// and "&". Raw text (code spans) is deliberately left alone,
-				// exactly as the HTML renderer leaves it.
-				v = util.UnescapePunctuations(v)
-				v = util.ResolveNumericReferences(v)
-				v = util.ResolveEntityNames(v)
-			}
-			b.Write(v)
+			// Value decodes with the decoder the parser attached to this node,
+			// which is the work v1 made callers do by hand with
+			// util.UnescapePunctuations and friends: a source "\*" or "&amp;"
+			// becomes "*" and "&", matching what the rendered card shows. Str
+			// would hand back the raw source instead.
+			b.WriteString(t.Value.Value(source))
 			if t.SoftLineBreak() || t.HardLineBreak() {
 				b.WriteByte(' ')
 			}
-		case *ast.String:
-			b.Write(t.Value)
 		case *ast.AutoLink:
-			// Label, not URL: for a GFM-linkified "www.example.com" the URL
-			// carries an "http://" the author never typed.
-			b.Write(t.Label(source))
-		case *ast.FencedCodeBlock, *ast.CodeBlock:
-			// Code blocks keep their content in Lines(), not in Text children.
-			lines := n.Lines()
-			for i := 0; i < lines.Len(); i++ {
-				seg := lines.At(i) // Value has a pointer receiver.
-				b.Write(seg.Value(source))
-			}
+			// Label, not Destination: for a GFM-linkified "www.example.com"
+			// the destination carries an "http://" the author never typed.
+			b.WriteString(t.Label.Value(source))
+		case *ast.CodeSpan:
+			// A code span holds its own content in v2 instead of wrapping raw
+			// Text children, so it needs a case of its own — without one, the
+			// `call()` in a card would vanish from the table cell. Its value
+			// carries the identity decoder, so an escape inside backticks
+			// stays literal exactly as the renderer writes it.
+			b.WriteString(t.Value.Value(source))
+		case *ast.CodeBlock:
+			// Fenced and indented code blocks are also one node in v2, with
+			// their content on Value rather than the block's Lines(). Lines
+			// has no decoder to apply, so Str is the whole of it.
+			b.WriteString(t.Value.Str(source))
 		}
 		// Anything else (RawHTML, HTMLBlock) is dropped, which matches
 		// Render's posture of never letting source HTML through.

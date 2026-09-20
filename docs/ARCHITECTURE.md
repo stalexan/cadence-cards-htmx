@@ -317,7 +317,7 @@ Small on purpose. The load-bearing ones:
 
 - **`modernc.org/sqlite`** — pure-Go SQLite driver (no cgo)
 - **`github.com/anthropics/anthropic-sdk-go`** — the Claude API client
-- **`github.com/yuin/goldmark`** — Markdown rendering for chat replies
+- **`github.com/yuin/goldmark/v2`** — Markdown rendering for chat replies and card content
 - **`gopkg.in/yaml.v3`** — deck import/export
 - **`golang.org/x/crypto`** — password hashing
 
