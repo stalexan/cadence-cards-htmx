@@ -65,13 +65,15 @@ func (c *Client) GenerateQuestionBatch(ctx context.Context, reqs []BatchQuestion
 			return nil, ctx.Err()
 		case <-time.After(batchPollInterval):
 		}
-		if batch, err = c.api.Messages.Batches.Get(ctx, batch.ID); err != nil {
+		// The params struct carries only an optional workspace-id header;
+		// this app has no workspace to name, so it stays zero.
+		if batch, err = c.api.Messages.Batches.Get(ctx, batch.ID, anthropic.MessageBatchGetParams{}); err != nil {
 			return nil, classifyAPIError(err)
 		}
 	}
 
 	out := make(map[int64]string, len(reqs))
-	stream := c.api.Messages.Batches.ResultsStreaming(ctx, batch.ID)
+	stream := c.api.Messages.Batches.ResultsStreaming(ctx, batch.ID, anthropic.MessageBatchResultsParams{})
 	for stream.Next() {
 		res := stream.Current()
 		// Results arrive in arbitrary order — always key by custom_id.
