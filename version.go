@@ -18,5 +18,5 @@ var versionFile string
 
 // Version is VERSION with surrounding whitespace trimmed (the file ends in a
 // newline). Well-formedness is asserted by TestVersionWellFormed, which runs
-// inside the Docker build — a malformed VERSION fails the image build.
+// inside the container build — a malformed VERSION fails the image build.
 var Version = strings.TrimSpace(versionFile)

@@ -1,0 +1,49 @@
+# Quadlet unit: systemd generates cadence-cards.service from this file.
+#
+# Rootless install (rootful: /etc/containers/systemd/ and drop --user):
+#   podman build -t localhost/cadence-cards .
+#   cp deploy/cadence-cards.container ~/.config/containers/systemd/
+#   cp .env.example ~/.config/containers/systemd/cadence-cards.env   # then edit; chmod 600
+#   systemctl --user daemon-reload
+#   systemctl --user start cadence-cards
+#   loginctl enable-linger "$USER"     # keep it running with nobody logged in
+#   tailscale serve --bg 3000
+#
+# See the README's Deployment section for upgrades, backups and restores.
+
+[Unit]
+Description=Cadence Cards
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=cadence-cards
+Image=localhost/cadence-cards:latest
+
+# Loopback only: tailscale serve is the sole way in. Anything that can reach
+# this port can also set X-Forwarded-For, which the rate limiter trusts.
+PublishPort=127.0.0.1:3000:3000
+
+# Named volume, created on first start. Holds cadence.db and its WAL files.
+Volume=cadence-data:/data
+
+# All app configuration (CLAUDE_API_KEY, TZ, ...). Relative to this file.
+# PORT and DB_PATH come from the image; don't set them here.
+EnvironmentFile=cadence-cards.env
+
+NoNewPrivileges=true
+DropCapability=all
+
+# Podman's default OCI image format drops a Containerfile HEALTHCHECK, so the
+# check is declared here.
+HealthCmd=curl -fsS http://localhost:3000/api/health || exit 1
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+HealthStartPeriod=15s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

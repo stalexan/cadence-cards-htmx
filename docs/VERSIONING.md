@@ -82,7 +82,7 @@ is simply ignored.
 This is why the file lives at the repository root rather than under a package:
 Go's `embed` cannot reference paths outside the embedding package's directory
 and rejects symlinks, so the root `VERSION` needs a root package to embed it.
-Deriving the version from git instead is not an option — `.dockerignore`
+Deriving the version from git instead is not an option — `.containerignore`
 excludes `.git`, so the build cannot run `git describe`.
 
 **A release is therefore one edit:** bump `VERSION`. The number the app reports
@@ -115,7 +115,7 @@ cannot disagree with the number git records, because there is only one number.
 
    `TestVersionMatchesGitTag` fails if `HEAD` carries a tag that disagrees with
    `VERSION`. It skips when git or `.git` is absent — which is exactly the case
-   inside the Docker build — so it only protects you when run from a checkout.
+   inside the container build — so it only protects you when run from a checkout.
 
 5. **Push to origin:**
    ```bash
@@ -131,7 +131,7 @@ cannot disagree with the number git records, because there is only one number.
 Three ways to ask a running or built image what it contains:
 
 ```bash
-docker compose run --rm app -version   # prints "1.0.3" and exits
+podman run --rm localhost/cadence-cards -version   # prints "1.0.3" and exits
 ```
 
 `-version` is handled before the logger, config loading, and the database open,
@@ -144,11 +144,11 @@ sidebar (and mobile drawer) of every signed-in page.
 ### If VERSION Is Malformed
 
 `TestVersionWellFormed` asserts the file is non-empty and shaped like
-`MAJOR.MINOR.PATCH[-prerelease]`. The Dockerfile runs `go test ./...` as part of
-the image build, so a malformed VERSION **fails `docker compose up --build`**
+`MAJOR.MINOR.PATCH[-prerelease]`. The Containerfile runs `go test ./...` as part of
+the image build, so a malformed VERSION **fails `podman build`**
 rather than shipping a binary with a blank or garbled version.
 
-Note that bumping VERSION invalidates the Dockerfile's `COPY . .` layer, forcing
+Note that bumping VERSION invalidates the Containerfile's `COPY . .` layer, forcing
 a full rebuild and test run. That is correct — the binary has to actually
 contain the new string.
 

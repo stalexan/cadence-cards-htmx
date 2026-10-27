@@ -177,8 +177,9 @@ func main() {
 // destination and refuses to overwrite an existing file, so it cannot write to
 // a pipe and the snapshot goes to a temp file first.  That file lives in
 // os.TempDir() — the container's writable layer, not the data volume — so a
-// backup leaves nothing behind.  (os.TempDir honors TMPDIR, so if the service
-// ever gains read_only: true the fix is a compose env var, not a code change.)
+// backup leaves nothing behind.  (os.TempDir honors TMPDIR, so if the Quadlet
+// unit ever gains ReadOnly=true the fix is an Environment= line, not a code
+// change.)
 func runBackup(ctx context.Context, dbPath, dest string, out io.Writer) error {
 	st, err := store.OpenForBackup(dbPath)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 
 // The bundled files are data, and data with no test is data that breaks in
 // front of a user. Every assertion here is something a new account's first
-// click depends on, so a bad sample fails the build — including the Docker
+// click depends on, so a bad sample fails the build — including the container
 // build, which runs the unit tests — rather than the gallery.
 func TestCatalogLoads(t *testing.T) {
 	all, err := All()

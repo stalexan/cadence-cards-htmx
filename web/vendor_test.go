@@ -13,8 +13,8 @@ import (
 // VENDOR.md is the lockfile for static/'s third-party files: with zero NPM
 // dependencies there is no manifest, no integrity field, and nothing but this
 // test to notice that a hand-vendored drop-in is truncated, tampered with, or a
-// different release than the record claims. It runs inside the Docker build
-// (which copies web/, .dockerignore strips only the root README), so a bad
+// different release than the record claims. It runs inside the container build
+// (which copies web/, .containerignore strips only the root README), so a bad
 // vendor fails the image rather than shipping.
 //
 // A section header names a file in static/; the fields under it are the record.

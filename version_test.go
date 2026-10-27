@@ -12,7 +12,7 @@ import (
 // here produces.
 var semverRe = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$`)
 
-// TestVersionWellFormed runs inside the Docker build (Dockerfile runs
+// TestVersionWellFormed runs inside the container build (Containerfile runs
 // "go test ./..."), so a malformed VERSION fails the image build rather than
 // shipping a blank version badge.
 func TestVersionWellFormed(t *testing.T) {
@@ -32,13 +32,13 @@ func TestVersionWellFormed(t *testing.T) {
 
 // TestVersionMatchesGitTag catches a tag that disagrees with VERSION. It can
 // only check tagged commits, and it must skip where git is unavailable — most
-// importantly inside the Docker build, where .dockerignore strips .git.
+// importantly inside the container build, where .containerignore strips .git.
 func TestVersionMatchesGitTag(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
 	if err := exec.Command("git", "rev-parse", "--git-dir").Run(); err != nil {
-		t.Skip("not a git checkout (e.g. inside the Docker build, where .git is .dockerignored)")
+		t.Skip("not a git checkout (e.g. inside the container build, where .git is .containerignored)")
 	}
 	out, err := exec.Command("git", "tag", "--points-at", "HEAD").Output()
 	if err != nil {

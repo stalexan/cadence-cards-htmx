@@ -5,7 +5,7 @@ dependencies is a project goal), so this file **is** the lockfile: it records wh
 from where, and what it hashed to.
 
 `vendor_test.go` enforces it. If the recorded SHA-256 disagrees with the embedded file, or a version
-appears in one field but not another, `go test ./...` fails — which also fails the Docker build,
+appears in one field but not another, `go test ./...` fails — which also fails the container build,
 since the image runs the suite. Update the file and this record in the same commit.
 
 Files we wrote ourselves (`app.css`, `app.js`, `favicon.svg`) are not listed.

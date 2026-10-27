@@ -9,7 +9,7 @@ import (
 )
 
 // dotEnvPath is read at startup when present. It is absent from the container
-// image (.dockerignore), so this is effectively local-development only.
+// image (.containerignore), so this is effectively local-development only.
 const dotEnvPath = ".env"
 
 // Config holds all runtime configuration.
@@ -37,7 +37,7 @@ type Config struct {
 
 	EnablePublicRegistration bool // ENABLE_PUBLIC_REGISTRATION
 	DisableRateLimiting      bool // DISABLE_RATE_LIMITING
-	CookieSecure             bool // COOKIE_SECURE, default true (TLS terminates at nginx)
+	CookieSecure             bool // COOKIE_SECURE, default true (TLS terminates at tailscale serve)
 }
 
 // Load reads configuration from the environment, first exporting any variables

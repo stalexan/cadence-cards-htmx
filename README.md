@@ -279,19 +279,20 @@ authentication itself works.
 ## Configuration
 
 All configuration is environment variables, and none of them are strictly required. `.env.example`
-is the template: copy it to `.env`, which both `docker compose` and the binary itself read — compose
-for `${VAR}` substitution, the app via `config.Load` at startup.
+is the template for both places they come from:
 
-Precedence is one rule: **a variable already present in the environment is never overwritten by
-`.env`.** So compose-supplied values always win in the container, and an inline
-`VAR=x go run ./cmd/cadence` always wins locally. `.env` is listed in `.dockerignore`, so the image
-never contains one and the file is effectively a local-development convenience. A missing `.env` is
-not an error; a malformed line fails startup with the file and line number.
+- **Locally**, copy it to `.env`; the binary reads it via `config.Load` at startup. Precedence is one
+  rule: **a variable already present in the environment is never overwritten by `.env`**, so an
+  inline `VAR=x go run ./cmd/cadence` always wins. A missing `.env` is not an error; a malformed line
+  fails startup with the file and line number.
+- **In the container**, copy it to `cadence-cards.env` beside the Quadlet unit (see
+  [Deployment](#deployment)), which hands every line to the container as real environment variables.
+  `.env` is listed in `.containerignore`, so the image never contains one.
 
 | Variable | Default | Read by | Notes |
 | --- | --- | --- | --- |
-| `PORT` | `3000` | app | Compose hardcodes `3000`; effectively local-dev only. |
-| `DB_PATH` | `/data/cadence.db` | app | Compose hardcodes the volume path. Set `./dev.db` locally. |
+| `PORT` | `3000` | app | The image sets `3000`, which the Quadlet unit publishes; effectively local-dev only. |
+| `DB_PATH` | `/data/cadence.db` | app | The image sets the volume path. Set `./dev.db` locally. |
 | `CLAUDE_API_KEY` | *(empty)* | app | Study-question generation and chat. Unset ⇒ those features return error bubbles; the rest of the app works. |
 | `CLAUDE_MODEL` | `claude-opus-5` | app | |
 | `CLAUDE_EFFORT` | `high` | app | Reasoning effort for the tutoring chat: `low`, `medium`, `high`, `xhigh`, or `max`. |
@@ -301,10 +302,9 @@ not an error; a malformed line fails startup with the file and line number.
 | `DISABLE_QUESTION_PREGEN` | `false` | app | Opt out of the nightly pre-generation batch (overnight API spend). Cards then always generate questions live. |
 | `QUESTION_PREGEN_HOUR` | `3` | app | Local hour (0–23) at/after which the nightly batch runs. Local time, so `TZ` applies. |
 | `ENABLE_PUBLIC_REGISTRATION` | `false` | app | When off, create users with `-create-user`. |
-| `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. **Not forwarded by compose** — local dev only. |
-| `DISABLE_RATE_LIMITING` | `false` | app | Dev only. **Not forwarded by compose.** |
+| `COOKIE_SECURE` | `true` | app | Set `false` only when serving plain HTTP. Local dev only — `tailscale serve` provides HTTPS. |
+| `DISABLE_RATE_LIMITING` | `false` | app | Dev only. |
 | `TZ` | `UTC` | container, app | SM-2 due dates use local-midnight day boundaries, so this decides when a card becomes due. Set it to your users' timezone. Also honoured from `.env` locally: `config.Load` runs before anything resolves `time.Local`, so a `TZ` set there still applies. |
-| `SHARED_NETWORK_NAME` | `cadence-cards-shared` | compose | External network the reverse proxy lives on. Not seen by the app. |
 
 Booleans are parsed strictly: only the literal string `true` enables them, anything else is false.
 `PORT` and `CLAUDE_MAX_TOKENS` fail startup with an error if they are set but unparseable, as do
@@ -315,79 +315,108 @@ root `VERSION` file at build time, so it cannot disagree with the binary it labe
 [docs/VERSIONING.md](docs/VERSIONING.md). Earlier revisions read an `APP_VERSION` variable; a
 leftover `APP_VERSION=` in an old `.env` is now ignored.
 
-The four "rarely needed" variables in `.env.example` (`PORT`, `DB_PATH`, `COOKIE_SECURE`,
-`DISABLE_RATE_LIMITING`) are not passed through by [`docker-compose.yml`](docker-compose.yml) —
-uncommenting them in `.env` affects a local `go run` but has no effect on the container. Add them to
-the `environment:` block if you need them there.
+The four "local `go run` only" variables at the bottom of `.env.example` (`PORT`, `DB_PATH`,
+`COOKIE_SECURE`, `DISABLE_RATE_LIMITING`) must stay commented out in the container's env file: the
+Quadlet unit passes every line through, so an uncommented `DB_PATH=./dev.db` would point the server
+away from its volume.
 
 `.env` parsing is deliberately minimal: `KEY=VALUE`, blank lines and `#` comment lines skipped, an
 optional `export ` prefix stripped, and the split on the first `=` only. Values may be wrapped in
 single or double quotes (escapes are interpreted inside double quotes). There is **no inline-comment
 stripping** — an unquoted value runs to end of line, so `NUM=4000 # note` yields the literal
 `4000 # note` and a startup error rather than silently truncating. Quote any value containing `#`.
+Podman's env-file reader, by contrast, takes values literally and keeps the quotes, so keep values in
+the container's copy unquoted.
 
 ## Deployment
 
-The intended deployment is **one container behind a reverse proxy** that terminates TLS.
+The intended deployment is **one rootless Podman container run by systemd through
+[Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)**, listening on
+loopback only, with **`tailscale serve`** in front of it providing HTTPS on your tailnet. The unit
+file is [`deploy/cadence-cards.container`](deploy/cadence-cards.container).
 
 ```bash
-cp .env.example .env                          # fill in CLAUDE_API_KEY, TZ
-docker network create cadence-cards-shared    # once, if it doesn't exist
-docker compose up -d --build
+podman build -t localhost/cadence-cards .
+mkdir -p ~/.config/containers/systemd
+cp deploy/cadence-cards.container ~/.config/containers/systemd/
+install -m 600 .env.example ~/.config/containers/systemd/cadence-cards.env   # fill in CLAUDE_API_KEY, TZ
+systemctl --user daemon-reload                 # Quadlet generates cadence-cards.service
+systemctl --user start cadence-cards
+loginctl enable-linger "$USER"                 # once: keep user services running after logout
+tailscale serve --bg 3000                      # https://<host>.<tailnet>.ts.net → 127.0.0.1:3000
 ```
 
-The container joins the external network `${SHARED_NETWORK_NAME}` (default `cadence-cards-shared`)
-under the alias `cadence-cards`, and **deliberately publishes no host port**. It is reachable only
-from that network, at `cadence-cards:3000` — put your proxy on the same network and point it there.
+A Quadlet unit has no `enable` step: the `[Install]` section is applied at generation time, so the
+service starts at boot once it has been through `daemon-reload`. For a rootful install, put both
+files in `/etc/containers/systemd/` and drop `--user`.
 
-### What the reverse proxy must do
+The unit publishes the port on `127.0.0.1` only, keeps the database in the named volume
+`cadence-data`, drops every capability, sets `no-new-privileges`, and declares the health check on
+`GET /api/health` (`podman healthcheck run cadence-cards`, or watch `podman ps`). The health check
+lives in the unit rather than the `Containerfile` because Podman builds OCI-format images, which
+have no `HEALTHCHECK` instruction.
 
-- **Terminate TLS.** The app sets `Secure` session cookies by default, so it has to be served over
-  HTTPS or logins won't stick. (Serving it over plain HTTP means setting `COOKIE_SECURE=false`,
-  which you should not do on a public host.)
-- **Pass through the browser's `Host` header.** CSRF protection compares `Origin` against `Host` on
+**Upgrading** is a rebuild and a restart; migrations run at startup:
+
+```bash
+git pull
+podman build -t localhost/cadence-cards .
+systemctl --user restart cadence-cards
+journalctl --user -u cadence-cards -n 20       # startup line shows the new version
+```
+
+### What `tailscale serve` provides — and what any other front end must
+
+- **TLS.** The app sets `Secure` session cookies by default, so it has to be served over HTTPS or
+  logins won't stick. `tailscale serve` does this with a certificate for your `ts.net` name.
+  (Serving it over plain HTTP means setting `COOKIE_SECURE=false`, which you should not do on a
+  shared network.)
+- **The browser's `Host` header, unchanged.** CSRF protection compares `Origin` against `Host` on
   every non-GET request; a rewritten `Host` makes every form submission fail with
   `403 Cross-origin request rejected`.
-- **Set `X-Forwarded-For`** (nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`).
-  The app trusts only the rightmost entry — the address the proxy itself saw; anything to its left,
-  and `X-Real-IP`, is client-supplied and spoofable. Without it, rate limiting and login lockouts see
-  every request as coming from the proxy and will lock out all users at once.
-- Optionally point health checks at `GET /api/health`, which pings the database and returns
-  `{"status":"ok"}` or a 503. The container already has its own `HEALTHCHECK` on that endpoint.
+- **`X-Forwarded-For`.** The app keys rate limiting and login lockouts on the **rightmost** entry of
+  that header. `tailscale serve` replaces it with the tailnet peer's address; a proxy that appends
+  (nginx's `$proxy_add_x_forwarded_for`) puts the address it saw last. Without it every request
+  appears to come from the proxy, and three bad logins lock out everyone. `X-Real-IP` is ignored —
+  `tailscale serve` passes a client's own value straight through.
+- **Sole access to the port.** Anything that can reach port 3000 directly can write its own
+  `X-Forwarded-For` and pick its own rate-limit bucket, which is why the unit binds `127.0.0.1`.
+  Exposing the app publicly with `tailscale funnel` works the same way, but turns those lockouts
+  into your only defense against the internet — keep `ENABLE_PUBLIC_REGISTRATION=false` if you do.
 
 ### First user
 
-With public registration off (the default), create the account from the container:
+With public registration off (the default), create the account inside the running container (`-it`
+because it prompts for a name and password):
 
 ```bash
-docker compose run --rm app -create-user you@example.com
+podman exec -it cadence-cards cadence -create-user you@example.com
 ```
 
-Same for a forgotten password, and for listing the accounts (`exec` on the running container works
-too):
+Same for a forgotten password, and for listing the accounts:
 
 ```bash
-docker compose run --rm app -reset-password you@example.com
-docker compose run --rm app -list-users
+podman exec -it cadence-cards cadence -reset-password you@example.com
+podman exec cadence-cards cadence -list-users
 ```
 
 To check which release an image contains, without starting the server or touching the database:
 
 ```bash
-docker compose run --rm app -version
+podman run --rm localhost/cadence-cards -version
 ```
 
 ### Data and backups
 
-The SQLite database lives at `/data/cadence.db` in the `cadence_data` volume. There is nothing else
+The SQLite database lives at `/data/cadence.db` in the `cadence-data` volume. There is nothing else
 to back up — no uploads, no external state.
 
 `cadence -backup` writes a consistent snapshot to a path, or to stdout with `-`. It is safe to run
 against the live server, so it suits a cron job or systemd timer:
 
 ```bash
-docker compose exec -T app cadence -backup - > cadence-$(date -u +%Y%m%dT%H%M%SZ).db
-docker compose exec -T app cadence -backup - | gzip -9 > cadence-$(date -u +%Y%m%dT%H%M%SZ).db.gz
+podman exec cadence-cards cadence -backup - > cadence-$(date -u +%Y%m%dT%H%M%SZ).db
+podman exec cadence-cards cadence -backup - | gzip -9 > cadence-$(date -u +%Y%m%dT%H%M%SZ).db.gz
 ```
 
 The snapshot is taken with `VACUUM INTO` inside a read transaction, so it neither blocks the server
@@ -398,39 +427,40 @@ from a running container is not a backup**: most of a busy database can be sitti
 the copy will open cleanly while missing it. (With the container *stopped*, a plain file copy is
 fine.)
 
-**`-T` is required, not cosmetic.** Without it Docker allocates a TTY, which merges the container's
-stderr into stdout and translates line endings — silently corrupting the file. With `-T` the two
-streams stay separate, which is what makes it safe for the snapshot to own stdout while log output
-goes to stderr. The command exits non-zero on any failure, having verified the snapshot with
-`PRAGMA quick_check` before handing it over.
+**Never add `-t` to that command.** A TTY merges the container's stderr into stdout and translates
+line endings — silently corrupting the file. Without one the two streams stay separate, which is
+what makes it safe for the snapshot to own stdout while log output goes to stderr. The command exits
+non-zero on any failure, having verified the snapshot with `PRAGMA quick_check` before handing it
+over.
 
-Passing a path instead of `-` writes the file inside the container, and also works against a stopped
-stack via `docker compose run --rm app -backup /data/snapshot.db`.
+Passing a path instead of `-` writes the file inside the container. With the service stopped, run
+the same thing in a throwaway container against the volume:
+`podman run --rm -v cadence-data:/data localhost/cadence-cards -backup /data/snapshot.db`.
 
 Snapshots contain bcrypt password hashes and session tokens: store them mode `0600`, and keep a copy
 somewhere other than this host — a backup on the same disk isn't one.
 
 #### Restoring
 
-The obvious `docker compose cp backup.db app:/data/cadence.db` is wrong twice over. It leaves the
+The obvious `podman cp backup.db cadence-cards:/data/cadence.db` is wrong twice over. It leaves the
 *old* `cadence.db-wal` beside the new file, which SQLite replays on the next start, corrupting the
-restore; and it writes the file as the host user, while the app runs as uid 10001 — and nothing in
-the container can `chown` it back, because `cap_drop: [ALL]` removes `CAP_CHOWN` even for root.
-Streaming it in on stdin avoids both, since every file is created inside the container:
+restore; and the copied file is not owned by the app's uid 10001. Streaming it in on stdin avoids
+both, since every file is created inside a container running as that user:
 
 ```bash
-docker compose stop app
-docker compose run --rm -T --no-deps --entrypoint sh app -c '
+systemctl --user stop cadence-cards            # Quadlet removes the container; the volume stays
+gunzip -c cadence-backup.db.gz | podman run --rm -i -v cadence-data:/data --entrypoint sh \
+    localhost/cadence-cards -c '
     set -e
-    gunzip > /data/restore.tmp
+    cat > /data/restore.tmp
     rm -f /data/cadence.db /data/cadence.db-wal /data/cadence.db-shm
     mv /data/restore.tmp /data/cadence.db
-' < cadence-backup.db.gz
-docker compose start app
-docker compose exec -T app cadence -backup - > /dev/null   # proves it opens and reads end to end
+'
+systemctl --user start cadence-cards
+podman exec cadence-cards cadence -backup - > /dev/null   # proves it opens and reads end to end
 ```
 
-Use `cat` in place of `gunzip` for an uncompressed snapshot.
+Use `cat cadence-backup.db` in place of `gunzip -c` for an uncompressed snapshot.
 
 Expired sessions and stale rate-limiter entries are cleaned up automatically every hour; no cron
 job or maintenance task is needed for those.
@@ -443,8 +473,8 @@ job or maintenance task is needed for those.
 - **SQLite** via the pure-Go driver `modernc.org/sqlite` — no CGo, one data file, WAL mode.
 - **Zero NPM dependencies and no frontend build step.** `web/templates` and `web/static` are
   embedded in the binary with `go:embed` (which does mean editing them requires a rebuild).
-- **One container**, based on `ubuntu:resolute`, running as a non-root user with all capabilities
-  dropped.
+- **One container**, based on Fedora 44 and run by Podman under systemd (Quadlet), as a non-root
+  user with all capabilities dropped.
 - **Strict CSP** with no `unsafe-inline` and no `unsafe-eval`, which is why there are no inline
   `<script>` tags, no `style=` attributes, and no `hx-on:*` handlers anywhere — all client behavior
   is declarative htmx attributes or delegated `data-*` listeners.
@@ -457,7 +487,7 @@ go vet ./...
 gofmt -l .           # must print nothing
 ```
 
-The test suite also runs inside the Docker build, so a failing test fails the image build.
+The test suite also runs inside the container build, so a failing test fails the image build.
 
 Once `DB_PATH` and `COOKIE_SECURE` are uncommented in your `.env`, a bare `go run ./cmd/cadence` is
 enough; inline variables remain handy for one-off overrides (`CLAUDE_MAX_TOKENS=99 go run
@@ -474,6 +504,7 @@ internal/ratelimit/   in-memory request + login-failure limiting
 internal/markdown/    goldmark wrapper (raw HTML escaped)
 internal/claude/      anthropic-sdk-go client + prompt building
 internal/server/      handlers, middleware, template rendering
+deploy/               Quadlet unit for running the container under systemd
 web/templates/        html/template layouts, pages, HTMX fragments
 web/static/           htmx.js (vendored, unminified), app.css, app.js, favicon
 web/VENDOR.md         provenance + checksums for the vendored assets (the lockfile we don't have)

@@ -1,5 +1,9 @@
+# Build with Podman: podman build -t localhost/cadence-cards .
+# Image names are fully qualified so Podman's short-name resolution never
+# prompts or guesses a registry.
+
 # --- build ---
-FROM golang:1.27 AS build
+FROM docker.io/library/golang:1.27 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -11,10 +15,12 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/cadence ./cmd/cade
 RUN CGO_ENABLED=0 go test ./...
 
 # --- runtime ---
-FROM ubuntu:resolute
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl tzdata \
- && rm -rf /var/lib/apt/lists/* \
+FROM registry.fedoraproject.org/fedora:44
+# curl is for the health check, which lives in the Quadlet unit
+# (deploy/cadence-cards.container): Podman's default OCI image format has no
+# HEALTHCHECK instruction, so one here would be dropped at build time.
+RUN dnf -y install --setopt=install_weak_deps=False ca-certificates curl tzdata shadow-utils \
+ && dnf clean all \
  && useradd --system --uid 10001 --create-home app \
  && mkdir -p /data && chown app:app /data
 COPY --from=build /out/cadence /usr/local/bin/cadence
@@ -23,6 +29,4 @@ ENV PORT=3000 \
     DB_PATH=/data/cadence.db
 VOLUME /data
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
-  CMD curl -fsS http://localhost:3000/api/health || exit 1
 ENTRYPOINT ["/usr/local/bin/cadence"]

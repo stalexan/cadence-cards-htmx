@@ -16,7 +16,7 @@ go test ./...        # all tests (pure logic + store + httptest handler tests)
 go vet ./...
 gofmt -l .           # must print nothing
 
-# Run locally (no Docker needed; CLAUDE_API_KEY optional — AI features
+# Run locally (no container needed; CLAUDE_API_KEY optional — AI features
 # degrade to error bubbles without it).  These inline vars are optional if
 # they are set in ./.env, which the binary reads at startup; anything already
 # in the environment takes precedence over the file.
@@ -32,8 +32,9 @@ go run ./cmd/cadence -reset-password you@example.com
 # List the accounts in the database
 go run ./cmd/cadence -list-users
 
-# Container (final image is ubuntu:resolute; unit tests run inside the build)
-docker compose up -d --build
+# Container (final image is fedora:44; unit tests run inside the build).
+# Deployed via the Quadlet unit in deploy/ — see the README's Deployment section.
+podman build -t localhost/cadence-cards .
 ```
 
 There is no frontend build step: `web/templates` and `web/static` are embedded
@@ -42,8 +43,9 @@ Editing them requires a rebuild.
 
 ### Leave nothing running
 
-**The user starts the app.** Don't run `go run ./cmd/cadence` or `docker compose up` to hand over a
-live instance — say what to start and let them start it. If you need a server for your own
+**The user starts the app.** Don't run `go run ./cmd/cadence`, `podman run`, or
+`systemctl --user start cadence-cards` to hand over a live instance — say what to start and let them
+start it. If you need a server for your own
 verification, run it on a non-default port against a throwaway `DB_PATH` (never `./dev.db`), and
 **kill it before you finish the task**, not at the start of the next one. The same goes for any
 other background process, watcher, or container you start: clean up in the turn that created it, and
@@ -59,7 +61,7 @@ and HTMX swapping fragments.
   sidebar badge, and `-version` all read it, and nothing at runtime can override it. Keep it
   stdlib-only — `internal/` packages import it, so any `cadence-cards/...` import here would cycle.
   A root package is required because `go:embed` cannot reach outside its own directory, and
-  `git describe` is unavailable at build time (`.git` is `.dockerignore`d). See `docs/VERSIONING.md`.
+  `git describe` is unavailable at build time (`.git` is `.containerignore`d). See `docs/VERSIONING.md`.
 - `cmd/cadence/` — wiring only: config → store/migrations → server → graceful shutdown; hourly
   maintenance ticker (session/conversation cleanup, rate-limiter pruning, and the nightly question
   pre-generation batch via `internal/pregen`); `-version`, `-create-user`, `-reset-password`, `-list-users`, and `-backup` CLI. `-version` is handled before
@@ -68,8 +70,8 @@ and HTMX swapping fragments.
 - `internal/config/` — env parsing (`PORT`, `DB_PATH`, `CLAUDE_*`, `ENABLE_PUBLIC_REGISTRATION`,
   `COOKIE_SECURE`, `DISABLE_RATE_LIMITING`).  `Load` first reads `./.env` (`dotenv.go`) and exports
   only keys **not already in the environment**, so the real environment always wins and a stray
-  `.env` can never override compose. A missing file is fine; `.env` is `.dockerignore`d, so this is
-  local-dev only.
+  `.env` can never override the container's env. A missing file is fine; `.env` is
+  `.containerignore`d, so this is local-dev only.
 - `internal/sm2/` — pure SM-2 algorithm, a port of the Svelte app's `sm2.ts` **including its
   tests**, verbatim except for two deliberate deviations the JS source lacks: `DaysBetween` rounds
   instead of floors (DST fix), and easiness is put through `RoundEasiness` (2 dp) so the
@@ -138,7 +140,7 @@ and HTMX swapping fragments.
   auto-suffixes the name rather than failing. `samples_test.go` is the gate: every file must parse
   clean, fill all seven prompt fields, carry `Provenance`, and contain **no SM-2 state**, so cards
   arrive new and the first study session is a full one. A broken sample fails `go test` (and the
-  Docker build), never a new account's first click.
+  container build), never a new account's first click.
 - `internal/pregen/` — nightly Message Batches job pre-generating questions for cards due within
   24h (`generated_questions` table, consumed on serve, invalidated on card edit/reset).
   Deliberately **not** on the `server.AI` interface — handlers never batch, so handler tests stay
@@ -164,7 +166,7 @@ and HTMX swapping fragments.
   used as HTMX fragments), `static/` (vendored `htmx.js` 2.0.10, unminified, `app.js`, `app.css`,
   favicon), `samples/` (the bundled sample topics — see `internal/samples/`).
   With no package manager, `web/VENDOR.md` **is** the lockfile for the vendored files —
-  version, source URL, SHA-256 — and `web/vendor_test.go` fails the build (including the Docker
+  version, source URL, SHA-256 — and `web/vendor_test.go` fails the build (including the container
   build) when the record and the embedded bytes disagree, so a drop-in and its record change in the
   same commit.  No Go test executes htmx; VENDOR.md lists the client-side flows to walk by hand
   after an upgrade.
@@ -238,11 +240,14 @@ millisecond precision (`store.timeFormat`).
 
 ## Deployment notes
 
-Compose joins an **external** network (`SHARED_NETWORK_NAME`, default `cadence-cards-shared`) with
-alias `cadence-cards`, so the existing external nginx (set up for the Svelte app) proxies to
-`cadence-cards:3000` unchanged.  The SQLite file lives in the `cadence_data` volume
-(`/data/cadence.db`); back it up with `docker compose exec -T app cadence -backup -`, which snapshots
-via `VACUUM INTO` (WAL-safe against the live server, and deliberately non-migrating — `exec` runs the
-*image's* binary, which can be newer than the running one). `TZ` should be set to the users' timezone for correct
+Rootless Podman on Fedora, run by systemd from the Quadlet unit `deploy/cadence-cards.container`
+(container `cadence-cards`, image `localhost/cadence-cards`). It publishes `127.0.0.1:3000` only and
+`tailscale serve` provides HTTPS in front of it — there is no nginx and no compose file. Config comes
+from `cadence-cards.env` beside the unit (Podman env-file: no quote stripping). The health check is
+declared in the unit, not the `Containerfile`, because Podman's OCI image format drops
+`HEALTHCHECK`. The SQLite file lives in the `cadence-data` volume (`/data/cadence.db`); back it up
+with `podman exec cadence-cards cadence -backup -` (never `-t`), which snapshots via `VACUUM INTO`
+(WAL-safe against the live server, and deliberately non-migrating — a `podman run` of a freshly
+built image can carry a newer binary than the running one). `TZ` should be set to the users' timezone for correct
 SM-2 due dates. There is no `AUTH_SECRET` — sessions are random server-side tokens (SHA-256-hashed
 at rest in the `sessions` table).

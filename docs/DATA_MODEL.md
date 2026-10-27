@@ -309,7 +309,7 @@ due date moves.
 ### Driver and connection
 
 `modernc.org/sqlite` — a pure-Go, cgo-free SQLite. That's what lets the app cross-compile and ship
-as a static-ish binary in a plain `ubuntu` image with no build toolchain.
+as a static-ish binary in a plain `fedora` image with no build toolchain.
 
 `store.Open` sets, per connection:
 
@@ -333,9 +333,9 @@ database would diverge from a fresh one.
 
 Migrations run automatically at startup, so a deploy is just a restart. The exceptions are
 deliberate: `-version` is handled before `store.Open` (works with a broken environment, never
-migrates) and `OpenForBackup` never migrates, since `docker compose exec` runs the *image's*
-binary, which can be newer than the running server's — migrating the live file underneath an older
-process would corrupt it.
+migrates) and `OpenForBackup` never migrates, since a backup can be taken by a `podman run` of a
+freshly built image whose binary is newer than the running server's — migrating the live file
+underneath an older process would corrupt it.
 
 SQLite's `ALTER TABLE` is limited (no drop/alter column in older versions, no constraint changes).
 The 12-step rebuild — create the new table, copy, drop, rename, inside the migration's transaction
@@ -362,7 +362,7 @@ tests exercise the paths that depend on it.
 
 ### Backups
 
-`cadence -backup <dest>` (`docker compose exec -T app cadence -backup -` in production) opens the
+`cadence -backup <dest>` (`podman exec cadence-cards cadence -backup -` in production) opens the
 database in a dedicated mode and runs **`VACUUM INTO`**:
 
 - Safe against a live server — the snapshot is taken inside a read transaction, so under WAL

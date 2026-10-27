@@ -10,9 +10,9 @@ import (
 
 // OpenForBackup opens an existing database without applying migrations.
 //
-// A backup can be taken with a *newer* binary than the running server —
-// `docker compose exec` runs the image's binary, not the container's process,
-// so between `docker compose build` and `up -d` the two differ — and applying
+// A backup can be taken with a *newer* binary than the running server — a
+// `podman run` of the image against the live volume uses the latest build, so
+// between `podman build` and the service restart the two differ — and applying
 // migrations to the live file underneath an older server would corrupt it.
 // A missing file is an error rather than a silently created empty database.
 func OpenForBackup(path string) (*Store, error) {

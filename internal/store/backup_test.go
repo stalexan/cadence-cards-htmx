@@ -86,8 +86,8 @@ func TestBackupRefusesExistingDestination(t *testing.T) {
 	}
 }
 
-// TestBackupWithConcurrentWriter covers the production shape: `docker compose
-// exec` snapshots through a second process while the server keeps writing.  Two
+// TestBackupWithConcurrentWriter covers the production shape: `podman exec`
+// snapshots through a second process while the server keeps writing.  Two
 // *Store values on one file is the closest in-process analogue — each has its
 // own *sql.DB, so they coordinate through SQLite's file locks rather than
 // through a shared pool.  Running both through a single store would prove

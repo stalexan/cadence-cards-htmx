@@ -54,7 +54,7 @@ redirects to `/login?registered=true` — registration does **not** log you in.
 
 ```bash
 go run ./cmd/cadence -create-user you@example.com          # local
-docker compose run --rm app -create-user you@example.com   # container
+podman exec -it cadence-cards cadence -create-user you@example.com   # container
 ```
 
 Prompts for a name and a password, then exits. This is the intended way to make the first account on
@@ -99,10 +99,11 @@ password specifically goes through `promptPasswordHash`:
 
 ## The CLI commands
 
-Every command below is a flag on the same binary — `cadence -create-user ...` — so in the container
-they are arguments to the image's entrypoint. `docker compose run --rm app <flag>` starts a
-throwaway container against the same `cadence_data` volume; `docker compose exec app cadence <flag>`
-runs inside the live one. Both work: SQLite is in WAL mode with `busy_timeout=5000`, so a second
+Every command below is a flag on the same binary — `cadence -create-user ...`.
+`podman exec -it cadence-cards cadence <flag>` runs it inside the live container (`-it` because the
+password prompts want a terminal); `podman run --rm -it -v cadence-data:/data localhost/cadence-cards
+<flag>` starts a throwaway container against the same volume, which also works with the service
+stopped. Both work alongside the server: SQLite is in WAL mode with `busy_timeout=5000`, so a second
 process can write while the server is running.
 
 | Command | What it does | Touches |
@@ -117,10 +118,11 @@ exits before the logger, config and store are touched, and `-backup` snapshots t
 
 **Order matters in `main`.** `-version` and `-backup` are handled *before* `store.Open`, precisely so
 they never migrate. The three user commands are handled *after* it, so they do. That is a real
-consequence in production: `docker compose run --rm app -create-user ...` runs the **image's**
-binary, which may be newer than the running server, and opening the database applies any migrations
-that binary carries. If the image is newer than the container in service, create the user *after*
-deploying it, not before.
+consequence in production: `podman run --rm ... localhost/cadence-cards -create-user ...` runs the
+**latest built image's** binary, which may be newer than the running server, and opening the
+database applies any migrations that binary carries. If you have rebuilt but not yet restarted,
+create the user *after* `systemctl --user restart cadence-cards`, or use `podman exec`, which runs
+the binary of the container in service.
 
 ### Resetting a forgotten password
 
@@ -129,7 +131,7 @@ who has lost it, and there is no mailer to send a reset link. The CLI is the who
 
 ```bash
 go run ./cmd/cadence -reset-password you@example.com          # local
-docker compose run --rm app -reset-password you@example.com   # container
+podman exec -it cadence-cards cadence -reset-password you@example.com   # container
 ```
 
 An unknown email fails with `no user with email "..."` rather than silently doing nothing — use
@@ -180,7 +182,7 @@ place: the user's cookie. A database dump therefore cannot be replayed as a set 
 |---|---|---|
 | Name | `cadence_session` | |
 | `HttpOnly` | yes | JavaScript never needs it; this puts it out of reach of any XSS that gets past the CSP. |
-| `Secure` | `COOKIE_SECURE`, default **true** | TLS terminates at nginx in the deployed setup. Over plain `http://` you must set `COOKIE_SECURE=false` or the browser silently drops the cookie and you bounce straight back to the login page. |
+| `Secure` | `COOKIE_SECURE`, default **true** | `tailscale serve` terminates TLS in the deployed setup. Over plain `http://` you must set `COOKIE_SECURE=false` or the browser silently drops the cookie and you bounce straight back to the login page. |
 | `SameSite` | `Lax` | First half of the CSRF defense; `checkOrigin` is the second. |
 | `Path` | `/` | |
 | `Max-Age` | 30 days | `store.SessionDuration`, matching the source app's Auth.js `maxAge`. |
@@ -290,8 +292,8 @@ Three consequences worth internalizing:
   proxy wrote (`tailscale serve` replaces the header outright); everything to its left, and
   `X-Real-IP`, is client-supplied and spoofable. Without it every request behind the proxy shares
   the socket address of the proxy itself, and the first three bad logins lock out *everyone*. The
-  app's port must therefore be reachable only through the proxy: a client that can bypass it can
-  write the header itself.
+  same reasoning is why the port is published on loopback only: a client that can bypass the proxy
+  can write the header itself.
 - **A successful login clears the email's failure record but deliberately leaves the IP's alone.**
   Otherwise an attacker who owns one valid account on that address could launder the IP's brute-force
   budget by logging in between guesses.
