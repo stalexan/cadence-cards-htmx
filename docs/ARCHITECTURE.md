@@ -126,7 +126,7 @@ browser/htmx → middleware chain → handler → store → SQLite
 
 **Middleware** (`internal/server/middleware.go`), in the order a request meets them — outermost
 first: `logRequests` (structured `slog` line per request, with a request ID and duration) →
-`resolveClientIP` (trusts only the nginx-set `X-Real-IP`) → `rateLimit` → `securityHeaders` (CSP,
+`resolveClientIP` (trusts only the rightmost, proxy-written `X-Forwarded-For` entry) → `rateLimit` → `securityHeaders` (CSP,
 `X-Frame-Options`, etc.) → `loadSession` (attaches the user to the request context if the session
 cookie is valid) → `checkOrigin` (CSRF defense via `Sec-Fetch-Site`/`Origin`) → the mux.
 
@@ -290,7 +290,7 @@ Three tiers, matching the three kinds of code above:
 - **The store** gets a real SQLite file in a `t.TempDir()` per test — migrations and all. There's no
   mocking layer and no interface in front of `*store.Store`; it's fast enough not to need one.
 - **Handlers** run the *entire* middleware chain through `httptest`, driven by the `newTestApp`
-  helper in `internal/server/server_test.go` — which is why its `do` method sets `X-Real-IP` and
+  helper in `internal/server/server_test.go` — which is why its `do` method sets `X-Forwarded-For` and
   `Sec-Fetch-Site` headers, without which `resolveClientIP` and `checkOrigin` would reject the
   request. Extend `testApp` rather than hand-rolling requests.
 

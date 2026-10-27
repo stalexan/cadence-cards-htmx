@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -52,11 +53,15 @@ func (w *loggingWriter) WriteHeader(status int) {
 	w.ResponseWriter.WriteHeader(status)
 }
 
-// resolveClientIP trusts only the nginx-set X-Real-IP header (other client-IP
-// headers are spoofable), falling back to the socket address.
+// resolveClientIP trusts only the rightmost X-Forwarded-For entry — the one the
+// proxy in front of the app wrote — falling back to the socket address.
+// `tailscale serve` replaces the header with the tailnet peer's address; an
+// appending proxy (nginx's $proxy_add_x_forwarded_for) puts the address it saw
+// last. Entries to its left, and X-Real-IP, which tailscale serve passes
+// through untouched, are client-supplied and spoofable.
 func resolveClientIP(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.Header.Get("X-Real-IP")
+		ip := forwardedFor(r.Header.Values("X-Forwarded-For"))
 		if ip == "" {
 			host, _, err := net.SplitHostPort(r.RemoteAddr)
 			if err != nil {
@@ -66,6 +71,23 @@ func resolveClientIP(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxClientIP, ip)))
 	})
+}
+
+// forwardedFor returns the last address across all X-Forwarded-For lines, or
+// "" if it is absent or not an IP.
+func forwardedFor(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	last := lines[len(lines)-1]
+	if i := strings.LastIndexByte(last, ','); i >= 0 {
+		last = last[i+1:]
+	}
+	addr, err := netip.ParseAddr(strings.TrimSpace(last))
+	if err != nil {
+		return ""
+	}
+	return addr.Unmap().String()
 }
 
 // rateLimit applies the general per-IP request limit.

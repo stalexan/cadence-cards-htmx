@@ -206,7 +206,9 @@ millisecond precision (`store.timeFormat`).
   (along with honoring `priority`/`includeNew`/`limit`). Chat transcripts are the exception: they
   live server-side in `conversations`/`chat_messages`, and the DOM carries only the conversation
   ID — never replay browser-supplied history to Claude.
-- **Client IP**: trust the nginx-set `X-Real-IP` header only; everything else is spoofable. CSRF
+- **Client IP**: trust only the rightmost `X-Forwarded-For` entry (the one `tailscale serve`, or
+  any front proxy, wrote); everything to its left and `X-Real-IP` are spoofable — `tailscale serve`
+  passes a client's `X-Real-IP` straight through. `TestResolveClientIP` pins this. CSRF
   protection is SameSite=Lax cookies + the `Sec-Fetch-Site`/Origin check middleware on non-GET
   requests.
 - **SQLite specifics**: single connection (`SetMaxOpenConns(1)`), WAL, `busy_timeout=5000`, foreign

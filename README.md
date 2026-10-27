@@ -348,9 +348,10 @@ from that network, at `cadence-cards:3000` — put your proxy on the same networ
 - **Pass through the browser's `Host` header.** CSRF protection compares `Origin` against `Host` on
   every non-GET request; a rewritten `Host` makes every form submission fail with
   `403 Cross-origin request rejected`.
-- **Set `X-Real-IP`.** It is the only client-IP header the app trusts — everything else is
-  spoofable. Without it, rate limiting and login lockouts see every request as coming from the
-  proxy and will lock out all users at once.
+- **Set `X-Forwarded-For`** (nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`).
+  The app trusts only the rightmost entry — the address the proxy itself saw; anything to its left,
+  and `X-Real-IP`, is client-supplied and spoofable. Without it, rate limiting and login lockouts see
+  every request as coming from the proxy and will lock out all users at once.
 - Optionally point health checks at `GET /api/health`, which pings the database and returns
   `{"status":"ok"}` or a 503. The container already has its own `HEALTHCHECK` on that endpoint.
 

@@ -148,7 +148,7 @@ func New(cfg config.Config, st *store.Store, ai AI) (*Server, http.Handler, erro
 	// Middleware chain, wrapped innermost first: a request enters through
 	// logRequests (last line, outermost) and reaches the mux last. Order is
 	// load-bearing — resolveClientIP must wrap rateLimit so the limiter keys on
-	// the real X-Real-IP rather than the socket address.
+	// the proxy-supplied X-Forwarded-For rather than the socket address.
 	var h http.Handler = mux
 	h = checkOrigin(h)
 	h = s.loadSession(h)

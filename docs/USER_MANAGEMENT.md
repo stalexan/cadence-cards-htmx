@@ -286,9 +286,12 @@ Three consequences worth internalizing:
 
 - **State is per process and in memory.** A restart clears every lockout, and there is no shared
   store, so this is protection against brute force, not a distributed defense.
-- **`X-Real-IP` must be set by the proxy.** It is the only client-IP header the app trusts; anything
-  else is spoofable. Without it every request behind the proxy shares the socket address of the proxy
-  itself, and the first three bad logins lock out *everyone*.
+- **The proxy must set `X-Forwarded-For`.** The app trusts only its rightmost entry — the one the
+  proxy wrote (`tailscale serve` replaces the header outright); everything to its left, and
+  `X-Real-IP`, is client-supplied and spoofable. Without it every request behind the proxy shares
+  the socket address of the proxy itself, and the first three bad logins lock out *everyone*. The
+  app's port must therefore be reachable only through the proxy: a client that can bypass it can
+  write the header itself.
 - **A successful login clears the email's failure record but deliberately leaves the IP's alone.**
   Otherwise an attacker who owns one valid account on that address could launder the IP's brute-force
   budget by logging in between guesses.

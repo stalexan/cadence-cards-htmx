@@ -86,7 +86,7 @@ func (a *testApp) do(method, path string, form url.Values) *httptest.ResponseRec
 	} else {
 		req = httptest.NewRequest(method, path, nil)
 	}
-	req.Header.Set("X-Real-IP", "10.0.0.9")
+	req.Header.Set("X-Forwarded-For", "10.0.0.9")
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
 	if a.cookie != nil {
 		req.AddCookie(a.cookie)
@@ -170,7 +170,7 @@ func TestAuthLifecycle(t *testing.T) {
 	}
 	// HTMX unauthenticated -> HX-Redirect.
 	req := httptest.NewRequest("GET", "/cards/table", nil)
-	req.Header.Set("X-Real-IP", "10.0.0.9")
+	req.Header.Set("X-Forwarded-For", "10.0.0.9")
 	req.Header.Set("HX-Request", "true")
 	w := httptest.NewRecorder()
 	app.handler.ServeHTTP(w, req)
@@ -242,12 +242,52 @@ func TestOriginCheckRejectsCrossSite(t *testing.T) {
 	app := newTestApp(t, nil)
 	req := httptest.NewRequest("POST", "/login", strings.NewReader("email=a@b.c&password=x"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("X-Real-IP", "10.0.0.9")
+	req.Header.Set("X-Forwarded-For", "10.0.0.9")
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 	w := httptest.NewRecorder()
 	app.handler.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("cross-site POST = %d, want 403", w.Code)
+	}
+}
+
+// TestResolveClientIP pins which header the limiter keys on. tailscale serve
+// sets X-Forwarded-For to the tailnet peer but forwards a client's X-Real-IP
+// as-is, so trusting X-Real-IP would let any client pick its own rate-limit
+// bucket.
+func TestResolveClientIP(t *testing.T) {
+	cases := []struct {
+		name   string
+		xff    []string
+		realIP string
+		want   string
+	}{
+		{"tailscale serve", []string{"100.64.0.7"}, "", "100.64.0.7"},
+		{"appending proxy keeps rightmost", []string{"6.6.6.6, 100.64.0.7"}, "", "100.64.0.7"},
+		{"last of repeated lines", []string{"6.6.6.6", "100.64.0.7"}, "", "100.64.0.7"},
+		{"ipv6", []string{"fd7a:115c:a1e0::1"}, "", "fd7a:115c:a1e0::1"},
+		{"x-real-ip ignored", []string{"100.64.0.7"}, "6.6.6.6", "100.64.0.7"},
+		{"no header falls back to socket", nil, "6.6.6.6", "192.0.2.1"},
+		{"garbage falls back to socket", []string{"100.64.0.7, nonsense"}, "", "192.0.2.1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got string
+			h := resolveClientIP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = clientIP(r)
+			}))
+			req := httptest.NewRequest("GET", "/", nil) // RemoteAddr 192.0.2.1:1234
+			for _, v := range tc.xff {
+				req.Header.Add("X-Forwarded-For", v)
+			}
+			if tc.realIP != "" {
+				req.Header.Set("X-Real-IP", tc.realIP)
+			}
+			h.ServeHTTP(httptest.NewRecorder(), req)
+			if got != tc.want {
+				t.Errorf("clientIP = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -551,7 +591,7 @@ func TestRegistrationGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest("GET", "/register", nil)
-	req.Header.Set("X-Real-IP", "10.0.0.9")
+	req.Header.Set("X-Forwarded-For", "10.0.0.9")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
